@@ -1,0 +1,66 @@
+function [DFF0, Fzero] = baseline_calculation_glissante(Tr1b, bad_frames, sampling_rate) 
+    [NCell, Nz] = size(Tr1b);
+    
+    % Paramètres de la fenêtre glissante
+    window_size = floor(sampling_rate * 120); % Taille de la fenêtre (120 sec)
+    half_win = floor(window_size / 2);        % Demi-fenêtre pour centrer le calcul
+    step_size = floor(sampling_rate * 5);     % Avancement de la fenêtre (ex: tous les 5 sec)
+    percentile_value = 10;
+    
+    % Création de tous les centres X où le percentile sera calculé
+    centers = 1:step_size:Nz;
+    if centers(end) ~= Nz
+        centers = [centers, Nz]; % S'assure de toujours inclure la toute dernière frame
+    end
+    num_steps = length(centers);
+
+    % Initialisation des matrices de sortie (pour la rapidité)
+    DFF0 = zeros(NCell, Nz);
+    Fzero = zeros(NCell, Nz);
+    
+    for n = 1:NCell
+        trace = Tr1b(n, :);
+        
+        % 1. Masquer les bad frames
+        trace_masked = trace;
+        if exist('bad_frames', 'var') && ~isempty(bad_frames)
+            trace_masked(bad_frames) = NaN;
+        end
+        
+        anchor_X = zeros(1, num_steps);
+        anchor_Y = zeros(1, num_steps);
+        
+        % 2. Calcul du percentile glissant (au lieu de blocs)
+        for i = 1:num_steps
+            c = centers(i);
+            % La fenêtre prend les N frames avant et après le centre
+            idx_s = max(1, c - half_win);
+            idx_e = min(Nz, c + half_win);
+            
+            segment = trace_masked(idx_s:idx_e);
+            
+            anchor_X(i) = c;
+            anchor_Y(i) = prctile(segment, percentile_value);
+        end
+        
+        % 3. Nettoyage des ancres (si un segment entier était NaN)
+        valid_anchors = ~isnan(anchor_Y);
+        anchor_X = anchor_X(valid_anchors);
+        anchor_Y = anchor_Y(valid_anchors);
+        
+        % 4. Interpolation des petits espaces de 5 sec pour créer F0
+        if length(anchor_X) > 1
+            F0 = interp1(anchor_X, anchor_Y, 1:Nz, 'pchip', 'extrap');
+        else
+            % Cas rare : signal trop court ou tout est NaN
+            F0 = repmat(nanmean(anchor_Y), 1, Nz);
+        end
+        
+        % 5. Optionnel : Lissage final de la baseline pour adoucir les micro-variations
+        % F0 = movmean(F0, sampling_rate * 10); % Lissage sur 10 secondes
+        
+        % Calcul dF/F
+        DFF0(n, :) = (trace - F0) ./ F0;
+        Fzero(n, :) = F0;
+    end
+end

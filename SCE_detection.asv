@@ -1,0 +1,55 @@
+function [Race,SumAct,MAct,NRace,RasterRace,TRace, Raster] = SCE_detection(Raster,opts,bad_frames) 
+    % Note : J'ai ajouté 'Raster' en output, car il sera modifié.
+
+    sce_n_cells_threshold = opts.sce_n_cells_threshold;
+    MinPeakDistancesce = opts.MinPeakDistancesce;
+    synchronous_frames = opts.synchronous_frames;
+    [NCell, Nz] = size(Raster);
+    
+    % Optionnel: Sécurité absolue, forcer les bad frames à 0 dans le Raster dès le début
+    if exist('bad_frames','var') && ~isempty(bad_frames)
+         Raster(:, bad_frames) = 0;
+    end
+    
+    SumAct = sum(Raster, 1);
+    
+    %% NOUVEAU : Nettoyage préventif des événements aberrants
+    % On cherche directement les moments où Raster est trop plein, avant même findpeaks
+    max_cells_allowed = max(round(NCell * 0.30), 100); 
+    toxic_frames = SumAct > max_cells_allowed;
+    
+    if any(toxic_frames)
+        fprintf('Nettoyage Raster : %d frames aberrantes (> %d cellules) mises à zéro.\n', ...
+                sum(toxic_frames), max_cells_allowed);
+        % Dilatation (padding) pour nettoyer autour de l'artefact
+        toxic_frames_padded = conv(double(toxic_frames), [1 1 1], 'same') > 0;
+        % On efface ces frames du Raster !
+        Raster(:, toxic_frames_padded) = 0;
+        
+        % On doit recalculer SumAct puisque Raster a changé
+        SumAct = sum(Raster, 1); 
+    end
+    
+    %% Détection normale sur un Raster propre
+    [pks, locs] = findpeaks(SumAct, 'MinPeakHeight', sce_n_cells_threshold, 'MinPeakDistance', MinPeakDistancesce);
+    
+    % On met à jour TRace
+    TRace = locs;
+    NRace = length(TRace);
+    
+    % ===== CRÉER RACE MATRIX =====
+    MAct = zeros(1, Nz - synchronous_frames);
+    for i = 1:Nz - synchronous_frames
+        MAct(i) = sum(max(Raster(:, i:i+synchronous_frames), [], 2));
+    end
+    
+    Race = false(NCell, NRace);
+    RasterRace = zeros(NCell, Nz);
+    for i = 1:NRace
+        idx_start = max(1, TRace(i) - 1);
+        idx_end = min(Nz, TRace(i) + 2);
+        Race(:, i) = max(Raster(:, idx_start:idx_end), [], 2);
+        RasterRace(Race(:, i) == 1, TRace(i)) = 1;
+    end
+    Race = double(Race);
+end

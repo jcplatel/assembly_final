@@ -1,0 +1,9 @@
+identifier = 'suite2p';
+session = 'suite2p';
+F = readNPY(strcat(filename,'F.npy'));
+iscell = readNPY(strcat(filename,'iscell.npy'));
+F = double(F(iscell(:,1)>0,:));
+[NCell, Nz] = size(F);
+% position = zeros(1,Nz);
+speed = zeros(1,Nz);
+sampling_rate = 8;

@@ -1,4 +1,4 @@
-function [Tr1b,speedsm,Raster,SumAct,MAct,Race,Race_For_Clustering,RasterRace,WinRest, WinActive,TRace] = preprocessing_6(F,opts,speed,path)
+function [Tr1b,speedsm,Raster,SumAct,MAct,Race,RasterRace,WinRest, WinActive,TRace,Fzero,DFF0,th_detection,bad_frames,max_cells_allowed,opts] = preprocessing_6(F,opts,speed,path,sampling_rate,namefull)
 
 %% Load settings
 MinPeakDistancesce = opts.MinPeakDistancesce;      % 5 default
@@ -6,10 +6,7 @@ MinPeakDistance = opts.MinPeakDistance;          % 3 default
 threshold_peak = opts.threshold_peak;           % 3 default
 synchronous_frames = opts.synchronous_frames;       % 2 default
 sce_n_cells_threshold = opts.sce_n_cells_threshold; %10
-percentile = opts.percentile;
-minithreshold=opts.minithreshold;
 SG_window = opts.SG_window ; %default 7
-use_PCA=opts.use_PCA; %false
 motion_correction=opts.motion_correction;%false
 colorsubstraction=opts.colorsubstraction;%false
 
@@ -17,114 +14,75 @@ colorsubstraction=opts.colorsubstraction;%false
  Tr1b=double(F);
 
 %% correct for motion artifact
-if motion_correction==true
-    [Tr1b,bad_frames_no_movement] = motion_correction_substraction (Tr1b,path,speed); 
+if ~isfile(strcat(path, 'Fall.mat')); motion_correction = false ;end
+if motion_correction==true 
+    %path="E:\Data\Aurelie\data\nocues\444119\220919_plane0\";
+    [Tr1b,bad_frames] = motion_correction_substraction (Tr1b,path,speed);
+    save(strcat(path,'badframes.mat'),"bad_frames") 
 end
 %% correct for motion artifact
 if colorsubstraction==true
     [Tr1b,colorcell] = color_substraction (Tr1b,path) ;
 end
-%% filtering, normalising
-Tr1b = sgolayfilt(Tr1b', 3, SG_window)';
-[NCell, Nz] = size(Tr1b);
 
+%% filtering, normalising
+
+[NCell, Nz] = size(Tr1b);
 speedsm = smoothdata(speed, 'gaussian', 50);
 
 %% baseline calculation
 
 if motion_correction==true
-    Tr1b = baseline_calculation (Tr1b,bad_frames);  
+    [DFF0,Fzero] = baseline_calculation_glissante2 (Tr1b,bad_frames,sampling_rate);  
 else
-    Tr1b = baseline_calculation (Tr1b);  
+    bad_frames = false(1,Nz);
+    [DFF0,Fzero] = baseline_calculation_glissante2 (Tr1b,bad_frames,sampling_rate);  
 end
+
+%% filtering
+Tr1b = sgolayfilt(DFF0', 3, SG_window)';
 
 %% définition fenetre active rest
 
-WinRest = find(speedsm <= 1) ;
+% WinRest = find(speedsm <= 1) ;
 % WinActive = find((speedsm > 2) & ~bad_frames');
-WinActive = find(speedsm > 2);
+isActive = (speedsm > 1); 
+isActive_expanded = movmax(isActive, [3 3]);
+if length(isActive_expanded)>Nz 
+    isActive_expanded=isActive_expanded(1:Nz);
+end
+WinActive = find(isActive_expanded);
+WinRest = find(~isActive_expanded);
+
+%% Rest period has to be 3sec
+WinRest_bin = false(1, Nz);
+WinRest_bin(WinRest) = true;
+taille_minimum = floor(sampling_rate*3); %3seconds
+WinRest_bin = bwareaopen(WinRest_bin, taille_minimum);
+WinRest = find(WinRest_bin);
 
 %%  DÉTECTION DES TRANSIENTS
 
 % Raster = transient_detection_mad (Tr1b,MinPeakDistancesce,MinPeakDistance,threshold_peak,WinRest,WinActive);
-Raster = transient_detection_std (Tr1b,MinPeakDistancesce,MinPeakDistance,threshold_peak,WinRest,WinActive);
-
+% [Raster,th] = transient_detection_std (Tr1b,MinPeakDistancesce,MinPeakDistance,threshold_peak,WinRest,WinActive);
+[Raster,Acttmp2,th_detection] = transient_detection_shot_theta (Tr1b,MinPeakDistancesce,MinPeakDistance,threshold_peak,WinRest,WinActive,DFF0,namefull,Fzero);
 
 %% 
 % ÉLIMINER LES CELLULES HYPERACTIVES 
+n_transients_total = sum(cellfun(@length, Acttmp2));
+transients_percell = cellfun(@length, Acttmp2);
+n_transients_percell = sum(cellfun(@length, Acttmp2))/NCell;
+seuil_frequence = prctile(cellfun(@length, Acttmp2), 99);
 
-% nombre_transients_par_cellule = cellfun(@length, Acttmp2);
-% seuil_frequence = prctile(nombre_transients_par_cellule, 99);
-% cellules_hyperactives_idx = find(nombre_transients_par_cellule > seuil_frequence);
+seuil_frequence = 0.2 ;%1 pic tous les 5 sec
+max_peak = max(length(WinRest)/sampling_rate * seuil_frequence,200) ;
+cellules_hyperactives_idx = find(transients_percell > max_peak);
+
 % if ~isempty(cellules_hyperactives_idx)
 %     Raster(cellules_hyperactives_idx, :) = 0;
 % end
 
 % ===== DÉTECTION DES SCE (Synchronous Events) =====
-%%%%shuffling to find threshold for number of cell for sce detection
-% MActsh = zeros(1,Nz-synchronous_frames);   
-% Rastersh=zeros(NCell,Nz);   
-% NShfl=100;
-% Sumactsh=zeros(Nz-synchronous_frames,NShfl);   
-% for n=1:NShfl
-% 
-%         for c=1:NCell
-%             k = randi(Nz-length(WinActive));
-%             Rastersh(c,:)= circshift(Raster(c,:),k,2);
-%         end
-% 
-%         for i=1:Nz-synchronous_frames   %need to use WinRest???
-%             MActsh(i) = sum(max(Rastersh(:,i:i+synchronous_frames),[],2));
-%         end
-% 
-%     Sumactsh(:,n)=MActsh;
-% end
-% 
-% percentile = 95; % Calculate the 5% highest point or 99
-% sce_n_cells_threshold = prctile(Sumactsh, percentile,"all");
-%% activité moyenne
 
-SumAct = sum(Raster, 1);
-[pks, locs] = findpeaks(SumAct, 'MinPeakHeight', sce_n_cells_threshold, 'MinPeakDistance', MinPeakDistancesce);
+[Race,SumAct,MAct,NRace,RasterRace,TRace, Raster,max_cells_allowed, opts] = SCE_detection3 (Raster,opts,bad_frames);
 
-% % Filtrer les SCE : enlever celles qui tombent sur des bad frames
-% if exist('bad_frames','var')
-%     sces_valid_mask = ~bad_frames(locs)';
-%     locs = locs(sces_valid_mask);
-%     pks = pks(sces_valid_mask);
-% end 
-
-% Filtrer les SCE aberrantes (outliers)
-% absolute_threshold = 100;
-% TF_relative = isoutlier(pks, "percentiles", [0 99]);
-% TF_absolute = pks > absolute_threshold;
-% TF_combined = TF_relative & TF_absolute;
-% idx_to_remove = find(TF_combined);
-% if ~isempty(idx_to_remove)
-%     Raster(:, locs(idx_to_remove)) = 0;
-% end
-
-% Recalculer après filtrage
-SumAct = sum(Raster, 1);
-[pks, TRace] = findpeaks(SumAct, 'MinPeakHeight', sce_n_cells_threshold, 'MinPeakDistance', MinPeakDistancesce);
-
-NRace = length(TRace);
-fprintf('nSCE après filtrage bad_frames : %d\n', NRace);
-
-% ===== CRÉER RACE MATRIX (Participation des cellules aux SCE) =====
-MAct = zeros(1, Nz - synchronous_frames);
-for i = 1:Nz - synchronous_frames
-    MAct(i) = sum(max(Raster(:, i:i+synchronous_frames), [], 2));
-end
-
-fprintf('Sum transient: %d\n', sum(MAct));
-
-Race = false(NCell, NRace);
-RasterRace = zeros(NCell, Nz);
-for i = 1:NRace
-    Race(:, i) = max(Raster(:, TRace(i)-1:TRace(i)+2), [], 2);
-    RasterRace(Race(:, i) == 1, TRace(i)) = 1;
-end
-
-Race = double(Race);
-Race_For_Clustering = Race;

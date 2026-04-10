@@ -1,8 +1,8 @@
-function [Tr1b] = baseline_calculation (Tr1b,bad_frames) 
+function [DFF0,Fzero] = baseline_calculation (Tr1b,bad_frames,sampling_rate) 
 
 [NCell, Nz] = size(Tr1b);
-window_size = 600;
-percentile_value = 5;
+window_size = floor(sampling_rate*120);%2 minutes was 60 sec
+percentile_value = 10;
 num_blocks = ceil(Nz / window_size);
 
 for n = 1:NCell
@@ -49,10 +49,12 @@ for n = 1:NCell
         F0 = repmat(nanmean(anchor_Y), 1, Nz);
     end
   % % Calcul dF/F
-    % figure(Visible="on");plot(Tr1b(n,:));hold on; plot(F0);hold on
-    Tr1b(n, :) = (trace - F0) ./ F0;
+    
+    DFF0(n, :) = (trace - F0) ./ F0;
+    Fzero(n,:)=F0;
+    % figure(Visible="on");plot(trace);hold on; plot(F0);hold on
     % yyaxis right
-    % plot(Tr1b(n,:));
+    % plot(Fdetrend(n,:));
   % 
 
 end

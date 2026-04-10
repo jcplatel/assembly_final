@@ -1,4 +1,4 @@
-function Raster = transient_detection_std (Tr1b,MinPeakDistancesce,MinPeakDistance,threshold_peak,WinRest,WinActive);
+function [Raster,th] = transient_detection_std (Tr1b,MinPeakDistancesce,MinPeakDistance,threshold_peak,WinRest,WinActive);
 
 [NCell, Nz] = size(Tr1b);
 Raster = zeros(NCell,Nz);
@@ -9,6 +9,7 @@ minithreshold=0.1;
 for i=1:NCell    
     
     th(i)=threshold_peak*std(Tr1b(i,WinRest));
+    
     % th(i)=max ([2*iqr(Tr1b(i,WinRest)) ,2.576*std(Tr1b(i,WinRest))]) ;
     % [amplitude,locs] = findpeaks(Tr1b(i,:),'MinPeakProminence',th(i),'MinPeakDistance',MinPeakDistance);
     [amplitude,locs] = findpeaks(Tr1b(i,:),'MinPeakProminence',th(i) ,'MinPeakDistance',MinPeakDistance);%2.576= 99%, 3.291=99.9
@@ -30,3 +31,4 @@ for i = 1:NCell
         Raster(i,Acttmp2{i}) = 1;           %Raster = real raster of cell activity
     end
 end
+

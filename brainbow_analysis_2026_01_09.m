@@ -7,30 +7,54 @@ close all
 %% load path
 if ispc
     % PathSave='E:\Data\Aurelie\analysis\December2025\assembly\nocuesPCA\';%PC
-    PathSave='E:\Data\Aurelie\analysis\Jan2026\assembly\';
+    PathSave='E:\Data\Aurelie\analysis\March2026\nocues\assembly\';
     % load("E:\Data\Aurelie\data\nocues\nocues.mat");%PC
     load("E:\Data\Aurelie\data\nwb_file\listnwb.mat");
+
     % PathSave='E:\Data\Aurelie\analysis\November2025\assembly\cuesPCA\';%PC
     % load("E:\Data\Aurelie\data\cues\cues.mat")
 elseif ismac
     PathSave='/Users/platel/Desktop/exp/brainbow_hippocampus/analysis/nocues';%mac
     load("/Users/platel/Desktop/exp/brainbow_hippocampus/analysis/final_analysis/bestnocuesold.mat")
 end
-%%index = contains(matfile,'444152_221130');%227 
-% 444119 19 = num 22
-% for file_num=1:numel (matfile) %54  444178 at 57  65 crash à cause gros artefact 73 plein d'assemblées ani 198, 1306
-% for file_num=[2:5,9,12:14,16,22:27 ,30:33,35,37,46,47,50,53:56,59,61:66,69,70]
-    % for file_num=[5,9,12:14,16,22:27 ,30:33,35,37,46,47,50,53:56,59,61:66,69,70]
-for file_num=171:184%119
-    % try
-    clearvars -except file_num matfile PathSave 
+
+
+% Il faut bien utiliser "uifigure" et "uitextarea" (pas juste "figure")
+fig_log = uifigure('Name', 'Journal de Traitement', 'Position', [500, 300, 500, 400]);
+txt_log = uitextarea(fig_log, ...
+    'Position', [20, 20, 460, 360], ...
+    'Editable', 'off', ...
+    'FontName', 'Consolas'); % Police style terminal
+temps_global = tic;
+historique = {}; 
+log_analyse = sprintf('log_analyse_%s.txt', datestr(now, 'yy_mm_dd_HH_MM'));
+fid = fopen(log_analyse, 'w', 'n', 'UTF-8'); 
+fprintf(fid, '=== DÉBUT DE L''ANALYSE : %s ===\n', datestr(now));
+fclose(fid);
+
+for file_num=303:numel (matfile) 
+    temps_fichier = tic; 
+    try
+    clearvars -except file_num matfile PathSave total_files temps_global temps_fichier historique txt_log fig_log
     close all
     filename=string(matfile{file_num});
-    % filename="C:\Users\jcplatel\Documents\labo\manon\plane1\P22D_230301_230316_13_230323_plane0_2024_05_28.15-20-08.nwb";
     [path,name,ext] = fileparts(filename);
-    identifier = name
-    file_num
+    identifier = extractBetween(name,5,24);
+    daytime = datestr(now,'yy_mm_dd_HH_MM_SS');
     path =strcat(path ,'\');%pc
+
+    namefull = strcat(PathSave ,identifier ,'_',daytime  ,'\');%pc
+    mkdir (namefull) ;
+
+    % affichage fenetre avancement
+    id_propre = strrep(identifier, '_', '-'); 
+    nouvelle_ligne = sprintf('Fichier %d/%d : %s en cours.', file_num, numel (matfile) , id_propre);
+    historique{end+1} = nouvelle_ligne;
+    txt_log.Value = historique;
+    scroll(txt_log, 'bottom');
+    drawnow; 
+
+    %fprintf('%s numéro %d ; ', identifier, file_num);
     % path=strcat(path ,'/');%mac % filename =
     % '/Users/platel/Desktop/exp/brainbow_hippocampus/data/matfile/411582_230320_plane0.mat';
     % load (filename) % session=name; % str = [name ' / file_num= '
@@ -41,17 +65,17 @@ for file_num=171:184%119
     opts = struct();
     opts.MinPeakDistancesce = 5;
     opts.MinPeakDistance    = 3;
-    opts.threshold_peak     = 2.576;
+    opts.threshold_peak     = 2.33; %1.645;%2.33 99%; %3.09  99.9%; %2.576;
     opts.synchronous_frames = 2;
     opts.sce_n_cells_threshold = 10;
     opts.percentile         = NaN;
     opts.minithreshold      = 0.1;
-    opts.SG_window          = 9;
+    opts.SG_window          = 7;
     opts.use_PCA=false;
     opts.motion_correction=false;
     opts.colorsubstraction=false;
     %%
-    [Tr1b,speedsm,Raster,SumAct,MAct,Race,Race_For_Clustering,RasterRace,WinRest, WinActive,TRace] = preprocessing_6(F,opts,speed,path);
+    [Tr1b,speedsm,Raster,SumAct,MAct,Race,Race_For_Clustering,RasterRace,WinRest, WinActive,TRace,Fzero,Fdetrend,th_detection,bad_frames] = preprocessing_6(F,opts,speed,path,sampling_rate,namefull);
     % preprocessing_4
     [NCell, Nz] = size(Tr1b);
  %cell extraction, denoising, normalisation, baseline substraction, find SCE
@@ -59,13 +83,13 @@ for file_num=171:184%119
     find_ncluster = true;
     
     if find_ncluster == true %%find best K
-        for ncluster = 4:20
-            ncluster
+        for ncluster = 4:2:20
+            % ncluster
             %clearvars -except start_PC n_bad_no_move nPC_Final Race_For_Clustering best_SClOK nb_lap Sil DB CH find_ncluster SumAct MAct best_S Nz minithreshold percentile synchronous_frames MinPeakDistance MinPeakDistancesce sce_n_cells_threshold Tr1b WinRest file_num matfile PathSave nanalysis NClini nanalysis path filename F iscell speed name identifier ncluster best_NCl sampling_rate session namefull Race
             % str=['test clustering ' num2str(ncluster) ' clusters'];
-            daytime = datestr(now,'yy_mm_dd_HH_MM_SS');
+            
             % fprintf ('%s ; ',str , daytime) 
-            namefull = strcat(PathSave ,daytime ,'_',name ,'/');%pc
+            % namefull = strcat(PathSave ,daytime ,'_',name ,'/');%pc
             % mkdir (namefull) ;   % make folder for saving analysis
             NClini  =ncluster;
             % NClini=5
@@ -80,45 +104,98 @@ for file_num=171:184%119
             best_NCl(ncluster)=NCl;
             best_S(ncluster)=mean(sCl);
             best_SClOK(ncluster)=mean(sClOK);
+
         end
     end
+        if find_ncluster==true
+            best_NCl_interp=best_NCl;
+            best_NCl_interp(best_NCl == 0) = NaN;
+            best_S_interp=best_S;
+            best_S_interp(best_S == 0) = NaN;
+            best_SClOK_interp=best_SClOK;
+            best_SClOK_interp(best_SClOK == 0) = NaN;
+            best_NCl_interp   = fillmissing(best_NCl_interp, 'linear');
+            best_S_interp     = fillmissing(best_S_interp, 'linear');
+            best_SClOK_interp = fillmissing(best_SClOK_interp, 'linear');
 
-    for nanalysis=1%4:20%[12 ,15, 17, 18]%:5
+            bestK2 
+            [~, idx_NCl]   = max(best_NCl_interp(4:end));
+            idx_NCl        = idx_NCl + 3; % Corrige l'indice puisqu'on a commencé à 4
+            
+            [~, idx_SClOK] = max(best_SClOK_interp(4:end));
+            idx_SClOK      = idx_SClOK + 3;
+            
+            [~, idx_S]     = max(best_S_interp(4:end));
+            idx_S          = idx_S + 3;
+
+            NClini = [NClini, idx_NCl, idx_SClOK, idx_S];
+            NClinit = unique(NClini, 'stable');
+        else 
+            NClinit = [4,5,11,19];
+        end
+        namefullold = namefull;
+
+    for nanalysis=NClinit%4:20%[12 ,15, 17, 18]%:5
 
         %clearvars -except NCell n_bad_no_move start_PC nPC_Final Race_For_Clustering best_SClOK Sil CH DB find_ncluster MAct best_S Nz minithreshold percentile synchronous_frames MinPeakDistance MinPeakDistancesce sce_n_cells_threshold Tr1b WinRest file_num matfile PathSave nanalysis NClini path filename F iscell speed name identifier best_NCl sampling_rate session Race
-        daytime = datestr(now,'yy_mm_dd_HH_MM_SS');
-        % namefull=strcat(PathSave ,daytime ,'_',name ,'_exvivocolorPC2_30/');%pc
-        namefull=strcat(PathSave ,daytime ,'_',name ,'exvivocluster_colorcellnew_invivo/');%pc
+        % daytime = datestr(now,'yy_mm_dd_HH_MM_SS');
+        % % namefull=strcat(PathSave ,daytime ,'_',name ,'_exvivocolorPC2_30/');%pc
+        % namefull=strcat(PathSave ,daytime ,'_',name ,'/');%pc
+        NClini=nanalysis;
+        
+        namefull = strcat (namefullold,'/','k',num2str(nanalysis),'/');
         mkdir (namefull) ;   % make folder for saving analysis
 
-        if find_ncluster==true
-            bestK2 
-        else 
-            NClini=7;
-        end
-
         % NClini=nanalysis;
-        fprintf ('clusters: %d ', NClini)
+        % fprintf ('clusters: %d ', NClini)
         kmean_iter=1000; kmeans_surrogate=100; kmeans_rnd_iter=100;savefig=1;
         % clustering_assembly_2 
         clustering_PCA1
-        fprintf ('clusters: %d ', NCl)
+        % fprintf ('clusters: %d ', NCl)
         
         exportdata
         save(strcat(namefull,'results.mat')) 
         raster_rastermap
-
+        % path_colorcell="E:\Data\Aurelie\data\chroms\119\220923\registration\colorcell.mat"; 
+        % path_colorcell="E:\Data\Aurelie\data\chroms\119\220919\registration\colorcell.mat"; 
         if NCl>1
             rastercolor
             graphSCE
-            %brainbowassemblies2025_11_26
-            %distance_calculation
+            % brainbowassemblies2025_11_26
+            % distance_calculation
             % export_data_brainbow
             % save(strcat(namefull,'brainbow.mat') )
         end
     end
+    %maj affichage
+    pause(1.5); 
+    sec_fichier = toc(temps_fichier);
+    sec_global = toc(temps_global);
+    str_temps_f = string(duration(0, 0, sec_fichier, 'Format', 'mm:ss'));
+    str_temps_g = string(duration(0, 0, sec_global, 'Format', 'hh:mm:ss'));
+    id_propre = strrep(identifier, '_', '-'); 
+    nouvelle_ligne = sprintf('Fichier %d/%d [%s] : %s terminé (Temps fichier : %s | Total : %s)', ...
+                             file_num, numel (matfile) , id_propre, str_temps_f, str_temps_g);
+    historique{end+1} = nouvelle_ligne;
+    txt_log.Value = historique;
+    scroll(txt_log, 'bottom');
+    drawnow;
 
-    % catch exception
-    %     disp(exception.message);  % Display the error message
-    % end
+    catch exception
+        disp(exception.message);  % Display the error message
+        nouvelle_ligne = sprintf('❌ ERREUR sur [%s] : %s', id_propre, exception.message);
+    end
+
+    historique{end+1} = nouvelle_ligne;
+    txt_log.Value = historique;
+    scroll(txt_log, 'bottom');
+    drawnow;
+
+    fid = fopen(nom_fichier_log, 'a', 'n', 'UTF-8'); 
+    if fid ~= -1
+        % \r\n permet de faire un vrai retour à la ligne propre sous Windows
+        fprintf(fid, '%s\r\n', nouvelle_ligne); 
+        fclose(fid); % Fermer force l'enregistrement physique sur le disque
+    end
+
 end

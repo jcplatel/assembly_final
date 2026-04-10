@@ -1,0 +1,47 @@
+clear
+%chargements resultats analyse assemblée
+% load("E:\Data\Aurelie\analysis\Jan2026\assembly\26_01_09_08_35_15_P2M_444119_220919_plane0exvivocluster_colorcellnew_invivo\results.mat")
+%444119 220923plane0
+% load("E:\Data\Aurelie\analysis\November2025\assembly\nocues\25_11_23_11_37_14_P2M_444119_220923_plane0\results.mat");
+% load("E:\Data\Aurelie\data\nocues\444119\220922_plane0\results.mat");
+load("E:\Data\Aurelie\analysis\November2025\assembly\cues\25_11_20_18_21_12_P2M_411582_230330_plane0\results.mat");
+
+%% creation dossier
+daytime = datestr(now,'yy_mm_dd_HH_MM_SS');
+PathSave='E:\Data\Aurelie\analysis\March2026\cues\assembly\';
+name=name(5:end);
+namefull=strcat(PathSave ,daytime ,'_',name ,'newcolor/');%pc
+mkdir (namefull) ;   % make folder for saving analysis
+
+%% choose path for Fall.mat
+%path="E:\Data\Aurelie\data\nocues\444119\220919_plane0\";
+% path="E:\Data\Aurelie\data\nocues\444119\220923_plane0\";
+path="E:\Data\Aurelie\data\nocues\444119\220922_plane0\";
+E:\Data\Aurelie\data\cues\all\411582\230330_plane0
+
+% ("E:\Data\Aurelie\data\nocues\444119\220919_plane0\colorcellnew.mat")%last
+% colorcell made automatically
+%load ("E:\Data\Aurelie\data\chroms\119\220919\registration\colorcell.mat")%colorcell March 2026 not corrected
+%load ("E:\Data\Aurelie\data\nocues\444119\220919_plane0\colorcell_registration.mat")
+
+% path_colorcell="E:\Data\Aurelie\data\chroms\119\220923\registration\colorcell.mat"; 
+% path_colorcell="E:\Data\Aurelie\data\nocues\444119\220923_plane0\colorcell.mat"; 
+path_colorcell="E:\Data\Aurelie\data\chroms\119\220922\registration\colorcell.mat"; 
+
+brainbowassemblies2025_11_26
+
+distance_calculation
+
+n_bad_no_move=0;
+start_PC=0;
+nPC_Final=0;
+
+if exist('freqsce','var')
+else
+    freqsce = []; 
+    freqsceok = []; 
+    mean_sClOK = []; 
+end
+export_data_brainbow
+
+save(strcat(namefull,'brainbow.mat') )

@@ -1,0 +1,867 @@
+clear
+close all
+
+%% chargement des données
+path_folder = "E:\Data\Aurelie\analysis\March2026\nocues\test_stability\411582_230320_plane0_26_04_09_17_34_56";
+% path_folder = "E:\Data\Aurelie\analysis\March2026\nocues\test_stability\411582_230320_plane0_26_04_07_19_03_26";
+% path_folder = "E:\Data\Aurelie\analysis\March2026\nocues\test_stability";
+path_results = strcat(path_folder,'\K4\results.mat');  %path just to load Fluo +WinRest
+% path_results = 'E:\Data\Aurelie\analysis\March2026\nocues\test_stability\411582_230320_plane0_26_04_06_17_17_46\K4\results.mat';
+data_results = load(path_results, 'Tr1b','WinRest');
+path_fall = 'E:\Data\Aurelie\data\nocues\411582\230320_plane0\Fall.mat';
+% path_fall = 'E:\Data\Aurelie\data\nocues\444119\220919_plane0\Fall.mat';
+load(path_fall, 'stat', 'iscell');
+
+WinRest=data_results.WinRest;
+Traces_Temporelles = data_results.Tr1b; % Matrice [Nb_Neurones x Temps]
+Traces_Temporelles = Traces_Temporelles (:,WinRest);
+
+%% test all clusters
+
+fichiers = dir(fullfile(path_folder, '**', 'results.mat'));
+
+max_ID = 0;
+nb_analyses = 0;
+
+% ---------------------------------------------------------------------
+% ÉTAPE 1 : Trouver la taille totale du réseau (le nombre de neurones)
+% On cherche la dimension de RasterRace pour s'assurer que la matrice
+% a la place d'accueillir TOUS les neurones, même ceux qui ont été 
+% exclus de tous les clusters.
+% ---------------------------------------------------------------------
+for f = 1:length(fichiers)
+    try
+        data = load(fullfile(fichiers(f).folder, fichiers(f).name), 'RasterRace');
+        if isfield(data, 'RasterRace')
+            max_ID = max(max_ID, size(data.RasterRace, 1));
+        end
+    catch
+        continue;
+    end
+end
+
+% Si on n'a rien trouvé, on sécurise
+if max_ID == 0
+    error('Impossible de déterminer le nombre de neurones (RasterRace introuvable).');
+end
+
+% Initialisation de la matrice carrée (Neurones x Neurones)
+Matrice = zeros(max_ID, max_ID);
+
+% ---------------------------------------------------------------------
+% ÉTAPE 2 : Remplissage de la matrice (Le Vote)
+% ---------------------------------------------------------------------
+for f = 1:length(fichiers)
+    try
+        % On charge UNIQUEMENT les clusters validés (votre filtre statistique)
+        data = load(fullfile(fichiers(f).folder, fichiers(f).name), 'assemblyortho');
+        
+        if isfield(data, 'assemblyortho')
+            
+            % ---> LE POINT CRUCIAL EST ICI <---
+            % Le fichier est valide, donc cette analyse K a bien eu lieu.
+            % On incrémente le dénominateur total MAINTENANT.
+            % Si un neurone n'est pas dans assemblyortho ci-dessous, 
+            % il prendra 0 pour ce tour, et sa moyenne baissera.
+            nb_analyses = nb_analyses + 1; 
+            
+            % On parcourt les clusters qui ont survécu à votre test
+            for c = 1:length(data.assemblyortho)
+                neurones_du_cluster = data.assemblyortho{c};
+                
+                % Un cluster doit contenir au moins 2 neurones pour créer une paire
+                if length(neurones_du_cluster) >= 2
+                    % On ajoute +1 (le Numérateur) pour toutes les paires
+                    % de neurones présents dans ce bon cluster
+                    Matrice(neurones_du_cluster, neurones_du_cluster) = ...
+                        Matrice(neurones_du_cluster, neurones_du_cluster) + 1;
+                end
+            end
+            
+        end
+    catch
+        fprintf('Erreur de lecture sur le fichier : %s\n', fichiers(f).name);
+    end
+end
+
+% ---------------------------------------------------------------------
+% ÉTAPE 3 : Conversion en Pourcentage
+% On divise chaque case par le nombre total de tests (nb_analyses)
+% ---------------------------------------------------------------------
+if nb_analyses > 0
+    Matrice = (Matrice / nb_analyses) * 100;
+    % fprintf('Consensus calculé avec succès sur %d analyses (K testés).\n', nb_analyses);
+else
+    warning('Aucune analyse valide n''a été trouvée.');
+end
+
+
+
+% =========================================================================
+% AFFICHAGE DE LA MATRICE DE CONSENSUS
+% =========================================================================
+figure('Name', 'Consensus (Clusters Filtrés)', 'Color', 'w', 'Position', [100 100 700 600]);
+imagesc(Matrice); 
+colormap('jet'); 
+colorbar; 
+axis square;
+title(sprintf('Matrice de Consensus (Pénalisation active) - %d Neurones', max_ID), 'FontSize', 14);
+xlabel('ID Neurone', 'FontWeight', 'bold'); 
+ylabel('ID Neurone', 'FontWeight', 'bold');
+% namegraph=strcat(namefull,['rasterall' , '.png']);
+% 
+% if isfolder(namefull)
+%     exportgraphics(gcf,namegraph,'Resolution',150,'BackgroundColor','black')
+%     close gcf
+% end
+
+%%
+% % =========================================================================
+% % 1 : Comparaison des Matrices de Co-occurrence (Consensus)
+% % =========================================================================
+
+% % Fonction interne (nested) pour calculer la matrice d'un dossier
+% 
+% fichiers = dir(fullfile(path_folder, '**', '*.mat'));
+% 
+% max_ID = 0;
+% nb_analyses = 0;
+% 
+% % 1. Trouver l'ID maximum (Combien de neurones au total dans l'enregistrement ?)
+% for f = 1:length(fichiers)
+%     try
+%         data = load(fullfile(fichiers(f).folder, fichiers(f).name), 'assemblyortho');
+%         if isfield(data, 'assemblyortho')
+%             for c = 1:length(data.assemblyortho)
+%                 if ~isempty(data.assemblyortho{c})
+%                     max_ID = max([max_ID, max(data.assemblyortho{c})]);
+%                 end
+%             end
+%         end
+%     catch; end
+% end
+% 
+% % Initialiser la matrice avec la vraie taille globale
+% Matrice = zeros(max_ID, max_ID);
+% 
+% % 2. Remplir la matrice
+% for f = 1:length(fichiers)
+%     try
+%         data = load(fullfile(fichiers(f).folder, fichiers(f).name), 'assemblyortho');
+%         if isfield(data, 'assemblyortho')
+%             nb_analyses = nb_analyses + 1; % On compte cette analyse !
+% 
+%             % On liste tous les neurones qui ont été classés dans un VRAI cluster (1, 2, 3...)
+%             neurones_sauves = []; 
+% 
+%             for c = 1:length(data.assemblyortho)
+%                 neurones_du_cluster = data.assemblyortho{c};
+%                 if ~isempty(neurones_du_cluster)
+%                     % Ils gagnent 1 point de co-occurrence mutuelle
+%                     Matrice(neurones_du_cluster, neurones_du_cluster) = ...
+%                         Matrice(neurones_du_cluster, neurones_du_cluster) + 1;
+% 
+%                     % On garde une trace de qui a été sauvé
+%                     neurones_sauves = [neurones_sauves, neurones_du_cluster];
+%                 end
+%             end
+% 
+%             % === LA RÈGLE MAGIQUE ===
+%             % Les neurones qui n'étaient PAS dans 'assemblyortho' (les rejetés)
+%             % n'ont gagné aucun point. 
+%             % Mais comme 'nb_analyses' a fait +1, leur moyenne va baisser !
+%         end
+%     catch; end
+% end
+% 
+% % 3. Diviser par le nombre TOTAL d'analyses (y compris quand le neurone était rejeté)
+% if nb_analyses > 0
+%     Matrice = (Matrice / nb_analyses) * 100;
+% end
+% 
+% 
+% figure('Name', 'Matrice de Consensus (Pénalisée)', 'Color', 'w', 'Position', [100 100 800 600]);
+% imagesc(Matrice); colormap('jet'); colorbar; axis square;
+% title('Consensus (Neurones non-significatifs pénalisés)');
+% xlabel('ID Neurone'); ylabel('ID Neurone');
+
+
+%%
+% =========================================================================
+% 2 :  Réorganisation des matrice Tri optimisé avec suppression du bruit
+% =========================================================================
+
+% 1. Filtrer le bruit : on met à 0 toutes les associations sous 25%
+Seuil = 0; 
+Mat_A_propre = Matrice; Mat_A_propre(Mat_A_propre < Seuil) = 0;
+
+% 2. Calculer la distance (sur les données filtrées)
+Dist_A = 100 - Mat_A_propre; Dist_A(logical(eye(size(Dist_A)))) = 0;
+
+% 3. Clustering avec la méthode 'average' (souvent plus propre pour ce type de matrice)
+Z_A = linkage(squareform(Dist_A), 'average');
+
+% Obtenir le nouvel ordre
+figure('Visible', 'on');
+[~, ~, ordre_A] = dendrogram(Z_A, 0); 
+
+close;
+
+% 4. Réorganiser les matrices d'origine (non-filtrées pour garder l'info visuelle)
+Matrice_A_triee_opt = Matrice(ordre_A, ordre_A);
+
+
+% Affichage
+figure('Name', 'Consensus Tri Optimisé', 'Color', 'w', 'Position', [100 100 1200 500]);
+imagesc(Matrice_A_triee_opt); colormap('jet'); colorbar; axis square;
+title('Consensus (Tri Optimisé)');
+
+% namegraph=strcat(namefull,['rasterall' , '.png']);
+% 
+% if isfolder(namefull)
+%     exportgraphics(gcf,namegraph,'Resolution',150,'BackgroundColor','black')
+%     close gcf
+% end
+
+%%
+% =========================================================================
+% RECHERCHE DU SEUIL OPTIMAL (Fit Exponentiel sur la queue du bruit)
+% =========================================================================
+
+% 1. Extraire les co-occurrences positives
+valeurs = Matrice(triu(true(size(Matrice)), 1));
+valeurs_positives = valeurs(valeurs > 0); 
+
+% 2. Créer l'histogramme pour en extraire les données
+% On utilise 40 bins pour lisser un peu les creux naturels
+[counts, edges] = histcounts(valeurs_positives, 40, 'Normalization', 'probability');
+bin_centers = edges(1:end-1) + diff(edges)/2;
+
+% 3. On ne garde que la partie gauche (le bruit massif) pour fitter l'exponentielle
+% Disons qu'on utilise les données jusqu'à 35% pour comprendre la forme de la chute
+idx_fit = bin_centers <= 35;
+x_fit = bin_centers(idx_fit)';
+y_fit = counts(idx_fit)';
+
+% On sécurise : si y_fit a des 0, on les enlève pour le log
+valid_idx = y_fit > 0;
+x_fit = x_fit(valid_idx);
+y_fit = y_fit(valid_idx);
+
+% 4. Ajustement d'un modèle exponentiel ( y = a * exp(b*x) )
+try
+    % L'astuce mathématique : log(y) = log(a) + b*x (régression linéaire)
+    p = polyfit(x_fit, log(y_fit), 1);
+    b = p(1); % Taux de chute (négatif)
+    a = exp(p(2)); % Amplitude initiale
+    
+    % On recalcule la courbe exponentielle théorique sur tout l'axe X
+    y_exp_theorique = a * exp(b * bin_centers);
+    
+    % 5. Trouver le seuil : le moment où les vraies données deviennent 
+    % significativement plus grandes que le bruit théorique (le plateau commence)
+    % On cherche où : Vraie_Donnée > 2 * Bruit_Theorique
+    for i = 1:length(bin_centers)
+        if bin_centers(i) > 20 && counts(i) > 2 * y_exp_theorique(i)
+            seuil_optimal = bin_centers(i);
+            break;
+        end
+    end
+catch
+    warning('Le fit exponentiel a échoué. Seuil par défaut : 40%');
+    seuil_optimal = 50;
+end
+
+% Sécurité plancher
+if seuil_optimal < 50
+    seuil_optimal = 50;
+end
+
+% =========================================================================
+% AFFICHAGE
+% =========================================================================
+figure('Name', 'Séparation Bruit / Signal (Modèle Exponentiel)', 'Color', 'w', 'Position', [200 200 800 500]);
+
+% Histogramme original
+bar(bin_centers, counts, 'FaceColor', [0.2 0.4 0.6], 'EdgeColor', 'w');
+hold on;
+
+% Tracer le modèle du bruit (exponentielle)
+plot(bin_centers, y_exp_theorique, 'k-', 'LineWidth', 2.5, 'DisplayName', 'Modèle du Bruit (Exponentiel)');
+
+% Ligne du seuil
+xline(seuil_optimal, 'r--', 'LineWidth', 2.5, ...
+    'Label', sprintf('Décollage du Signal : %.1f%%', seuil_optimal), ...
+    'LabelVerticalAlignment', 'bottom', ...
+    'LabelHorizontalAlignment', 'left', ...
+    'FontSize', 12, 'FontWeight', 'bold', 'Color', 'r');
+
+set(gca, 'YScale', 'log');
+% On fixe un axe Y propre pour ne pas être écrasé par les zéros du modèle
+ylim([min(counts(counts>0))/2, max(counts)*1.5]); 
+
+xlabel('Score de co-occurrence (%)', 'FontSize', 12, 'FontWeight', 'bold');
+ylabel('Probabilité (Échelle Log)', 'FontSize', 12, 'FontWeight', 'bold');
+title('Séparation Bruit / Signal (Déviation Exponentielle)', 'FontSize', 14);
+grid on;
+legend('Données réelles', 'Modèle du bruit théorique', 'Location', 'northeast');
+hold off;
+
+%%
+% =========================================================================
+% 6 : Histogramme en Log (Zoom sur le signal)
+% =========================================================================
+% 
+% % 1. Extraire le triangle supérieur
+% valeurs = Matrice(triu(true(size(Matrice)), 1));
+% 
+% % 2. Ignorer le bruit pur (0%) pour dé-zoomer l'axe Y
+% valeurs_positives = valeurs(valeurs > 5); % On coupe tout ce qui est sous 5%
+% 
+% figure('Name', 'Distribution (Zoom Signal)', 'Color', 'w', 'Position', [200 200 700 500]);
+% 
+% % 3. Afficher l'histogramme
+% h = histogram(valeurs_positives, 40, 'Normalization', 'count', ...
+%               'FaceColor', [0.8 0.3 0.1], 'EdgeColor', 'w');
+% 
+% % 4. Passer l'axe Y en Logarithmique !
+% set(gca, 'YScale', 'log');
+% 
+% % Décoration
+% xlabel('Score de co-occurrence (%)', 'FontSize', 12, 'FontWeight', 'bold');
+% ylabel('Nombre de paires (Echelle Log)', 'FontSize', 12, 'FontWeight', 'bold');
+% title('Distribution des paires associées (Zoom Logarithmique)', 'FontSize', 14);
+% grid on;
+
+
+%%
+%%%%%%%%%%%%%%%
+% 3 : Extraction Robuste des Assemblées (Clustering Hiérarchique)
+% =========================================================================
+ seuil_optimal=50;
+% 1. Définir le seuil (ex: 50%)
+Seuil_Core = seuil_optimal; 
+
+% 2. Convertir la matrice de co-occurrence (0-100) en matrice de distance (0-1)
+Matrice_Distance = 1 - (Matrice/ 100);
+
+% Extraire le triangle inférieur pour la fonction pdist/linkage
+% D = Matrice_Distance(tril(true(size(Matrice_Distance)), -1))';
+D = squareform(Matrice_Distance - diag(diag(Matrice_Distance))); 
+
+% 3. Créer l'arbre avec l'algorithme de Ward (Le secret pour éviter la fusion géante)
+% Arbre = linkage(D, 'ward');
+Arbre = linkage(D, 'average');
+
+% 4. Couper l'arbre selon votre seuil
+% Un seuil de similarité de 50% correspond à une distance de 0.5
+distance_max = 1 - (Seuil_Core / 100);
+IDX_Clusters = cluster(Arbre, 'Criterion', 'distance', 'Cutoff', distance_max);
+
+% 5. Analyser et stocker les assemblées trouvées
+Assemblees_Noyaux = {};
+taille_minimale = 5; % On augmente un peu la taille minimale pour ignorer les paires parasites
+c = 1;
+
+for i = 1:max(IDX_Clusters)
+    neurones = find(IDX_Clusters == i);
+    
+    if length(neurones) >= taille_minimale
+        sous_matrice = Matrice(neurones, neurones);
+        moyenne_co_occurence = mean(sous_matrice(triu(true(size(sous_matrice)), 1)));
+        
+        if moyenne_co_occurence >= Seuil_Core
+            Assemblees_Noyaux{c} = neurones;
+            c = c + 1;
+        end
+    end
+end
+
+
+
+% =========================================================================
+% AFFICHAGE DES RÉSULTATS DANS LA CONSOLE
+% =========================================================================
+% fprintf('\n--- RÉSULTATS DE L''EXTRACTION (Seuil: %.1f%%) ---\n', Seuil_Core);
+% fprintf('Nombre d''assemblées noyaux détectées : %d\n\n', length(Assemblees_Noyaux));
+
+% for i = 1:length(Assemblees_Noyaux)
+%     neurones = Assemblees_Noyaux{i};
+%     % fprintf('Assemblée Noyau %d (%d neurones) : ', i, length(neurones));
+% 
+%     % Afficher les 10 premiers neurones maximum pour ne pas inonder la console
+%     if length(neurones) > 10
+%         fprintf('%d, ', neurones(1:10));
+%         fprintf('... et %d autres\n', length(neurones)-10);
+%     elseif length(neurones) > 1
+%         fprintf('%d, ', neurones(1:end-1));
+%         fprintf('%d\n', neurones(end));
+%     else
+%         fprintf('%d\n', neurones(1));
+%     end
+% end
+
+% =========================================================================
+% 6. VISUALISATION DU RÉSEAU DES ASSEMBLÉES
+% =========================================================================
+
+% Étape A : Recréer un Graphe "propre" pour l'affichage (sans les ponts parasites)
+% On repart de la matrice, mais on ne garde les connexions que pour les neurones
+% qui ont été validés dans nos Assemblees_Noyaux.
+Matrice_Affichage = zeros(size(Matrice));
+
+% On remplit la matrice d'affichage cluster par cluster
+for i = 1:length(Assemblees_Noyaux)
+    neurones = Assemblees_Noyaux{i};
+    % On garde les vrais poids (similarités > seuil) pour l'épaisseur des traits
+    sous_matrice = Matrice(neurones, neurones);
+    sous_matrice(sous_matrice < Seuil_Core) = 0; % On coupe les liens faibles internes
+    Matrice_Affichage(neurones, neurones) = sous_matrice;
+end
+
+% On enlève la diagonale
+Matrice_Affichage(logical(eye(size(Matrice_Affichage)))) = 0;
+
+% Étape B : Création de la figure
+figure('Name', 'Réseau des Assemblées', 'Color', 'w', 'Position', [100, 100, 800, 600]);
+
+% On crée le graphe uniquement avec les poids gardés
+Graphe_Visualisation = graph(Matrice_Affichage, 'upper');
+
+% Tracer le graphe avec une disposition qui écarte les nœuds non connectés
+p = plot(Graphe_Visualisation, 'Layout', 'force', 'WeightEffect', 'direct', ...
+         'NodeColor', [0.8 0.8 0.8], 'MarkerSize', 4, 'EdgeAlpha', 0.3);
+
+hold on;
+title(sprintf('Réseau des Assemblées Extraites (Average, Seuil > %.1f%%)', Seuil_Core), 'FontSize', 14);
+
+% Étape C : Colorer chaque assemblée avec une couleur distincte
+% On génère une palette de couleurs distinctes
+couleurs = lines(length(Assemblees_Noyaux)); 
+
+for i = 1:length(Assemblees_Noyaux)
+    neurones = Assemblees_Noyaux{i};
+    
+    % On met en surbrillance les neurones de cette assemblée
+    highlight(p, neurones, 'NodeColor', couleurs(i,:), 'MarkerSize', 8, 'Marker', 'o');
+    
+    % On peut aussi épaissir les liens internes à l'assemblée
+    % (Optionnel, pour faire plus joli)
+    edges_idx = findedge(Graphe_Visualisation, neurones, neurones);
+    edges_idx = edges_idx(edges_idx > 0); % Garder les index valides
+    highlight(p, 'Edges', edges_idx, 'EdgeColor', couleurs(i,:), 'LineWidth', 1);
+end
+
+% Ajouter une légende propre
+for i = 1:length(Assemblees_Noyaux)
+    % Astuce pour la légende : créer des points invisibles
+    plot(NaN, NaN, 'o', 'MarkerFaceColor', couleurs(i,:), 'MarkerEdgeColor', 'none', ...
+         'DisplayName', sprintf('Assemblée %d (n=%d)', i, length(Assemblees_Noyaux{i})));
+end
+legend('Location', 'bestoutside');
+axis off; % Enlever les axes pour faire plus "réseau"
+hold off;
+
+%% chargement coordonnées cellules
+
+% =========================================================================
+% 4 : Extraction des coordonnées spatiales depuis Suite2p (Fall.mat)
+% =========================================================================
+
+% 1. Chargement du fichier généré par Suite2p
+% Assurez-vous d'avoir bien généré le fichier Fall.mat dans Suite2p
+% disp('Chargement des données Suite2p...');
+%load('E:\Data\Aurelie\data\nocues\411582\230320_plane0\Fall.mat', 'stat', 'iscell');
+
+% 2. Initialisation des variables
+Nb_Cellules_Totales = sum(iscell(:,1) == 1); % Compter le nombre de vrais neurones
+Coordonnees = zeros(Nb_Cellules_Totales, 2); % Matrice [N x 2] pour les X et Y
+IDs_Suite2p = zeros(Nb_Cellules_Totales, 1); % Pour garder une trace de l'ID original (optionnel)
+
+m = 0; % Compteur pour les vraies cellules
+
+% 3. Boucle sur tous les ROIs détectés par Suite2p
+for n = 1:length(stat)
+    
+    % On ne garde que les ROIs classés comme vraies cellules (iscell == 1)
+    if iscell(n, 1) == 1
+        m = m + 1;
+        
+        % Méthode 1 : Utiliser le centre médian pré-calculé par Suite2p
+        % C'est la méthode la plus propre. 'med' contient [Y, X].
+        if isfield(stat{n}, 'med')
+            Coordonnees(m, 1) = double(stat{n}.med(2)) + 1; % Coordonnée X (pixel)
+            Coordonnees(m, 2) = double(stat{n}.med(1)) + 1; % Coordonnée Y (pixel)
+        
+        % Méthode 2 (Alternative au cas où 'med' n'existe pas dans votre version)
+        % On calcule le centre géométrique moyen à partir de tous les pixels (xpix, ypix)
+        else
+            Coordonnees(m, 1) = mean(double(stat{n}.xpix)) + 1; 
+            Coordonnees(m, 2) = mean(double(stat{n}.ypix)) + 1; 
+        end
+        
+        % Sauvegarde de l'ID original de Suite2p (peut être utile plus tard)
+        IDs_Suite2p(m) = n;
+    end
+end
+
+% fprintf('%d cellules extraites avec succès.\n', m);
+
+% =========================================================================
+% TEST VISUEL RAPIDE
+% =========================================================================
+% Ce petit bloc permet de vérifier que l'extraction s'est bien passée
+% % en affichant simplement tous vos neurones sur une grille.
+% 
+% figure('Name', 'Vérification de l''extraction spatiale', 'Color', 'w');
+% scatter(Coordonnees(:,1), Coordonnees(:,2), 15, 'k', 'filled', 'MarkerFaceAlpha', 0.5);
+% set(gca, 'YDir', 'reverse'); % Très important en imagerie (le Y=0 est en haut)
+% axis equal;
+% title('Position de tous les neurones détectés (iscell=1)');
+% xlabel('Pixels X');
+% ylabel('Pixels Y');
+% grid on;
+
+%%% =========================================================================
+% =========================================================================
+% 5 : Graphe Spatial Clair (Réseaux en Étoile par Assemblée)
+% =========================================================================
+% 
+% % On suppose que vous avez déjà calculé 'Assemblees_Noyaux' (SCRIPT 4)
+% % et 'Coordonnees' (extraction Suite2p)
+% 
+% % % 1. Préparation de la figure
+% figure('Name', 'Carte Spatiale des Assemblées', 'Color', 'k', 'Position', [100 100 800 800]);
+% hold on; set(gca, 'Color', 'k', 'YDir', 'reverse'); axis equal; axis off;
+% 
+% % 2. Dessiner le bruit (les neurones qui n'appartiennent à aucune assemblée noyau)
+% tous_neurones_noyaux = [Assemblees_Noyaux{:}];
+% neurones_bruit = setdiff(1:size(Coordonnees, 1), tous_neurones_noyaux);
+% 
+% scatter(Coordonnees(neurones_bruit, 1), Coordonnees(neurones_bruit, 2), ...
+%         20, [0.3 0.3 0.3], 'filled', 'MarkerFaceAlpha', 0.5);
+% 
+% % 3. Générer une belle palette de couleurs contrastées
+% couleurs = lines(length(Assemblees_Noyaux));
+% 
+% % 4. Dessiner chaque assemblée
+% for i = 1:length(Assemblees_Noyaux)
+%     neurones_groupe = Assemblees_Noyaux{i};
+%     X_groupe = Coordonnees(neurones_groupe, 1);
+%     Y_groupe = Coordonnees(neurones_groupe, 2);
+% 
+%     % Calculer le centre géographique ("Hub") de cette assemblée
+%     centre_X = mean(X_groupe);
+%     centre_Y = mean(Y_groupe);
+% 
+%     % Dessiner les liens légers entre le hub et chaque neurone (réseau en étoile)
+%     for j = 1:length(neurones_groupe)
+%         plot([centre_X, X_groupe(j)], [centre_Y, Y_groupe(j)], ...
+%              'Color', [couleurs(i, :), 0.4], 'LineWidth', 1.5);
+%     end
+% 
+%     % Dessiner les neurones par-dessus
+%     scatter(X_groupe, Y_groupe, 60, couleurs(i, :), 'filled', ...
+%             'MarkerEdgeColor', 'w', 'LineWidth', 1);
+% 
+%     % Dessiner le hub (optionnel)
+%     scatter(centre_X, centre_Y, 100, 'w', 'p', 'filled'); % Étoile blanche au centre
+% end
+% 
+% title('Cartographie Spatiale des Cœurs d''Assemblées', 'Color', 'w', 'FontSize', 14);
+% %%
+
+% % =========================================================================
+% % 6 : Histogramme en Log (Zoom sur le signal)
+% % =========================================================================
+% 
+% % 1. Extraire le triangle supérieur
+% valeurs = Matrice(triu(true(size(Matrice)), 1));
+% 
+% % 2. Ignorer le bruit pur (0%) pour dé-zoomer l'axe Y
+% valeurs_positives = valeurs(valeurs > 5); % On coupe tout ce qui est sous 5%
+% 
+% figure('Name', 'Distribution (Zoom Signal)', 'Color', 'w', 'Position', [200 200 700 500]);
+% 
+% % 3. Afficher l'histogramme
+% h = histogram(valeurs_positives, 40, 'Normalization', 'count', ...
+%               'FaceColor', [0.8 0.3 0.1], 'EdgeColor', 'w');
+% 
+% % 4. Passer l'axe Y en Logarithmique !
+% set(gca, 'YScale', 'log');
+% 
+% % Décoration
+% xlabel('Score de co-occurrence (%)', 'FontSize', 12, 'FontWeight', 'bold');
+% ylabel('Nombre de paires (Echelle Log)', 'FontSize', 12, 'FontWeight', 'bold');
+% title('Distribution des paires associées (Zoom Logarithmique)', 'FontSize', 14);
+% grid on;
+
+
+% =========================================================================
+% 7 : Cartographie et Corrélation de Spearman (Traces Temporelles)
+% =========================================================================
+
+% Paramètres d'affichage spatial
+Seuil_Affichage = 85;%seuil_optimal; 
+Epaisseur_Max = 0.5;
+Nb_Assemblees = length(Assemblees_Noyaux);
+couleurs = lines(Nb_Assemblees);
+
+% 2. Calcul de la corrélation de Spearman "Baseline" (Toutes les cellules)
+% On transpose (Traces') car 'corr' dans MATLAB calcule la corrélation 
+% entre les COLONNES. On veut corréler les neurones entre eux sur le temps.
+% disp('Calcul de la corrélation de Spearman pour tout le réseau (baseline)...');
+Corr_Globale_Matrice = corr(Traces_Temporelles', 'Type', 'Spearman');
+
+% On ignore la diagonale (les 1) et on prend seulement le triangle supérieur
+valeurs_globales = Corr_Globale_Matrice(triu(true(size(Corr_Globale_Matrice)), 1));
+Spearman_Moyen_Global = mean(valeurs_globales, 'omitnan');
+
+% fprintf('-> Corrélation Spearman moyenne (Réseau entier) = %.3f\n\n', Spearman_Moyen_Global);
+
+% 3. Préparation de la figure
+cols = ceil(sqrt(Nb_Assemblees));
+rows = ceil(Nb_Assemblees / cols);
+figure('Name', 'Assemblées et Corrélations Temporelles', ...
+       'Color', 'k', 'Position', [50 50 1400 900]);
+
+% 4. Boucle sur chaque assemblée (Dessin + Calcul local)
+for a = 1:Nb_Assemblees
+    subplot(rows, cols, a); hold on;
+    set(gca, 'Color', 'k', 'YDir', 'reverse'); axis equal; axis off;
+    
+    % Dessiner le fond (neurones inactifs)
+    scatter(Coordonnees(:,1), Coordonnees(:,2), 10, [0.2 0.2 0.2], 'filled');
+    
+    % Neurones de cette assemblée
+    neurones_groupe = Assemblees_Noyaux{a};
+    
+    % ----- A. CALCUL DE LA CORRELATION INTRA-ASSEMBLÉE -----
+    % Extraire les traces uniquement pour les neurones de ce groupe
+    Traces_Groupe = Traces_Temporelles(neurones_groupe, :);
+    
+    % Calculer la matrice de corrélation Spearman pour ce petit groupe
+    Corr_Groupe_Matrice = corr(Traces_Groupe', 'Type', 'Spearman');
+    
+    % Moyenne intra-groupe (hors diagonale)
+    valeurs_groupe = Corr_Groupe_Matrice(triu(true(size(Corr_Groupe_Matrice)), 1));
+    Spearman_Intra = mean(valeurs_groupe, 'omitnan');
+    
+    % ----- B. DESSIN SPATIAL (Lignes + Noeuds) -----
+    for i = 1:length(neurones_groupe)
+        for j = (i+1):length(neurones_groupe)
+            id_1 = neurones_groupe(i);
+            id_2 = neurones_groupe(j);
+            score_consensus = Matrice(id_1, id_2);
+            
+            if score_consensus >= Seuil_Affichage
+                X = [Coordonnees(id_1, 1), Coordonnees(id_2, 1)];
+                Y = [Coordonnees(id_1, 2), Coordonnees(id_2, 2)];
+                epaisseur = (score_consensus / 100) * Epaisseur_Max;
+                plot(X, Y, 'Color', [couleurs(a, :), 0.6], 'LineWidth', epaisseur);
+            end
+        end
+    end
+    
+    X_groupe = Coordonnees(neurones_groupe, 1);
+    Y_groupe = Coordonnees(neurones_groupe, 2);
+    scatter(X_groupe, Y_groupe, 40, couleurs(a, :), 'filled', 'MarkerEdgeColor', 'w', 'LineWidth', 0.5);
+            
+    % ----- C. TITRE DYNAMIQUE AVEC LES STATISTIQUES -----
+    % Affiche le Spearman de l'assemblée vs la baseline du réseau
+    titre_ligne1 = sprintf('Assemblée %d (n=%d)', a, length(neurones_groupe));
+    titre_ligne2 = sprintf('Spearman: %.3f (Global: %.3f)', Spearman_Intra, Spearman_Moyen_Global);
+    
+    title({titre_ligne1, titre_ligne2}, 'Color', couleurs(a, :), 'FontSize', 11, 'FontWeight', 'bold');
+end
+
+% Titre de la fenêtre entière
+sgtitle('Réseaux spatiaux et Synchronisation Temporelle (Corrélation de Spearman)', ...
+        'Color', 'w', 'FontSize', 16, 'FontWeight', 'bold');
+
+% =========================================================================
+% 8 : Calcul du Meilleur K via results.mat + Cartographie
+% =========================================================================
+
+% 2. NOUVEAUX POIDS DU SCORE COMPOSITE
+w_sil        = 1%0.30;  % sil all clusters (séparation mathématique)
+w_assemblies = 0%0.10;  % Assemblies (quantité)
+w_recall     = 0%0.20;  % recall (SClok)
+w_sce        = 0%0.20;  % SCE_Purity
+w_cell       = 0%0.20;  % cell_Purity
+
+% =========================================================================
+% ÉTAPE 1 : EXTRACTION DES MÉTRIQUES ET CALCUL DU BEST K
+% =========================================================================
+% fprintf('Analyse des dossiers K dans : %s\n', path_folder);
+dossiers_K = dir(fullfile(path_folder, '*K*')); 
+
+% Initialisation des listes
+Ks_list = []; Silh = []; Recall = []; CellSpec = []; SCEPurity = []; AssembliesCount = [];
+
+for i = 1:length(dossiers_K)
+    if ~dossiers_K(i).isdir, continue; end
+    
+    k_num_str = regexp(dossiers_K(i).name, '\d+', 'match');
+    if isempty(k_num_str), continue; end
+    current_k = str2double(k_num_str{1});
+    
+    fichier_res = fullfile(dossiers_K(i).folder, dossiers_K(i).name, 'results.mat');
+    if ~isfile(fichier_res), continue; end
+    
+    try
+        data = load(fichier_res, 'RasterRace', 'NRace', 'NRaceOK', 'mean_sClOK', 'assemblyortho','WinRest');
+        
+        % Variables temporaires pour s'assurer que tout est valide avant d'ajouter
+        temp_silh = NaN; temp_recall = 0; temp_cell = NaN; temp_sce = NaN; temp_asc = 0;
+        
+        % 1. Silhouette
+        if isfield(data, 'mean_sClOK') && ~isnan(data.mean_sClOK)
+            temp_silh = data.mean_sClOK;
+        else, continue; end % On passe si pas de silhouette
+        
+        % 2. Recall
+        if isfield(data, 'NRaceOK') && data.NRace > 0
+            temp_recall = (data.NRaceOK / data.NRace) * 100;
+        end
+        
+        % 3. Quantité d'assemblées
+        if isfield(data, 'assemblyortho')
+            temp_asc = length(data.assemblyortho);
+        end
+        
+        % 4. Specificity & Purity
+        if isfield(data, 'assemblyortho') && isfield(data, 'RasterRace')
+            nb_clusters = length(data.assemblyortho);
+            nb_SCE = size(data.RasterRace, 2);
+            participation_SCE = zeros(nb_clusters, nb_SCE);
+            
+            for c = 1:nb_clusters
+                if ~isempty(data.assemblyortho{c})
+                    participation_SCE(c, :) = sum(data.RasterRace(data.assemblyortho{c}, :), 1);
+                end
+            end
+            
+            [val_max, SCE_labels] = max(participation_SCE, [], 1);
+            SCE_labels(val_max == 0) = 0;
+            
+            cell_spec_inter = NaN(1, nb_clusters);
+            sce_purity = NaN(1, nb_clusters);
+            
+            for c = 1:nb_clusters
+                cellules = data.assemblyortho{c};
+                idx_SCE = (SCE_labels == c);
+                if sum(idx_SCE) > 0 && ~isempty(cellules)
+                    tirs_in_box = sum(data.RasterRace(cellules, idx_SCE), 'all');
+                    tirs_totaux_colonne = sum(data.RasterRace(:, idx_SCE), 'all');
+                    if tirs_totaux_colonne > 0, sce_purity(c) = tirs_in_box / tirs_totaux_colonne; end
+                    
+                    tirs_totaux_ligne = sum(data.RasterRace(cellules, SCE_labels > 0), 'all');
+                    if tirs_totaux_ligne > 0, cell_spec_inter(c) = tirs_in_box / tirs_totaux_ligne; end
+                end
+            end
+            temp_cell = mean(cell_spec_inter, 'omitnan');
+            temp_sce = mean(sce_purity, 'omitnan');
+        end
+        
+        % Si on arrive ici sans erreur, on ajoute tout dans nos listes définitives
+        Ks_list(end+1) = current_k;
+        Silh(end+1) = temp_silh;
+        Recall(end+1) = temp_recall;
+        AssembliesCount(end+1) = temp_asc;
+        CellSpec(end+1) = temp_cell;
+        SCEPurity(end+1) = temp_sce;
+        
+    catch
+        continue;
+    end
+end
+
+% Remplacer les NaN éventuels par 0 avant normalisation
+CellSpec(isnan(CellSpec)) = 0;
+SCEPurity(isnan(SCEPurity)) = 0;
+
+% Fonction de normalisation Min-Max (sécurisée contre les divisions par zéro)
+safe_norm = @(x) (x - min(x)) ./ max(1e-9, max(x) - min(x));
+
+% Calcul du Score Composite avec vos nouveaux poids
+ScoreGlobal = (w_sil * safe_norm(Silh)) + ...
+              (w_assemblies * safe_norm(AssembliesCount)) + ...
+              (w_recall * safe_norm(Recall)) + ...
+              (w_sce * safe_norm(SCEPurity)) + ...
+              (w_cell * safe_norm(CellSpec));
+
+[best_score, idx] = sort(ScoreGlobal,'descend');
+Best_K = Ks_list(idx(1:1));
+
+% =========================================================================
+% ÉTAPE 2 : PRÉPARATION DES COORDONNÉES ET TRACES POUR LE BEST K
+% =========================================================================
+for n =1:length(Best_K)
+    knum=Best_K(n);
+    % disp('Chargement des traces temporelles et des coordonnées pour ce Best K...');
+    dossier_best_k = strcat(path_folder, '\K' ,num2str(knum));
+    fichier_best_k = strcat(dossier_best_k, '\results.mat');
+    data_best = load(fichier_best_k, 'assemblyortho');
+    
+    % Nettoyage : on ne garde que les assemblées avec au moins 5 neurones
+    Assemblees = {};
+    for i = 1:length(data_best.assemblyortho)
+        if length(data_best.assemblyortho{i}) >= 5
+            Assemblees{end+1} = data_best.assemblyortho{i};
+        end
+    end
+    Nb_Assemblees = length(Assemblees);
+    
+    % Baseline Spearman globale
+    Corr_Globale = corr(Traces_Temporelles', 'Type', 'Spearman');
+    Spearman_Global = mean(Corr_Globale(triu(true(size(Corr_Globale)), 1)), 'omitnan');
+    
+    % =========================================================================
+    % ÉTAPE 3 : CARTOGRAPHIE ET CORRÉLATION (SPEARMAN)
+    % =========================================================================
+    % disp('Création de la figure finale...');
+    cols = ceil(sqrt(Nb_Assemblees)); rows = ceil(Nb_Assemblees / cols);
+    couleurs = lines(Nb_Assemblees);
+    
+    figure('Name', sprintf('Meilleur K = %d', knum), 'Color', 'k', 'Position', [50 50 1400 900]);
+    
+    for a = 1:Nb_Assemblees
+        subplot(rows, cols, a); hold on;
+        set(gca, 'Color', 'k', 'YDir', 'reverse'); axis equal; axis off;
+        
+        % Fond gris
+        scatter(Coordonnees(:,1), Coordonnees(:,2), 10, [0.2 0.2 0.2], 'filled');
+        
+        % Calcul Spearman pour l'assemblée
+        neurones_groupe = Assemblees{a};
+        Traces_Groupe = Traces_Temporelles(neurones_groupe, :);
+        Corr_Groupe = corr(Traces_Groupe', 'Type', 'Spearman');
+        Spearman_Intra = mean(Corr_Groupe(triu(true(size(Corr_Groupe)), 1)), 'omitnan');
+        
+        % Dessin des liens
+        for i = 1:length(neurones_groupe)
+            for j = (i+1):length(neurones_groupe)
+                if Corr_Groupe(i,j) > 0.3 % Filtre d'affichage visuel
+                    X = [Coordonnees(neurones_groupe(i), 1), Coordonnees(neurones_groupe(j), 1)];
+                    Y = [Coordonnees(neurones_groupe(i), 2), Coordonnees(neurones_groupe(j), 2)];
+                    epaisseur = Corr_Groupe(i,j) * 4;
+                    plot(X, Y, 'Color', [couleurs(a, :), 0.5], 'LineWidth', epaisseur);
+                end
+            end
+        end
+        
+        % Dessin des neurones
+        scatter(Coordonnees(neurones_groupe, 1), Coordonnees(neurones_groupe, 2), ...
+                40, couleurs(a, :), 'filled', 'MarkerEdgeColor', 'w', 'LineWidth', 0.5);
+                
+        % Titre du cluster
+        t1 = sprintf('Cluster %d (n=%d)', a, length(neurones_groupe));
+        t2 = sprintf('Spearman: %.3f (Total: %.3f)', Spearman_Intra, Spearman_Global);
+        title({t1, t2}, 'Color', couleurs(a, :), 'FontSize', 11, 'FontWeight', 'bold');
+    end
+    
+    % Titre principal
+    sgtitle(sprintf('Topologie au Meilleur K (K=%d )', knum), ...
+            'Color', 'w', 'FontSize', 16, 'FontWeight', 'bold');
+end
