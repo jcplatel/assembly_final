@@ -1,17 +1,18 @@
-clear
-close all
+
 
 %% chargement des données
-% path_folder = "E:\Data\Aurelie\analysis\March2026\nocues\test_stability\411582_230320_plane0_26_04_09_17_34_56";
-path_folder = "E:\Data\Aurelie\analysis\April2026\nocues\assembly\444119_220919_plane0_26_04_20_11_23_24";
-% path_folder = "E:\Data\Aurelie\analysis\March2026\nocues\test_stability\411582_230320_plane0_26_04_07_19_03_26";
-% path_folder = "E:\Data\Aurelie\analysis\March2026\nocues\test_stability";
-path_results = strcat(path_folder,'\K4\results.mat');  %path just to load Fluo +WinRest
-% path_results = 'E:\Data\Aurelie\analysis\March2026\nocues\test_stability\411582_230320_plane0_26_04_06_17_17_46\K4\results.mat';
-data_results = load(path_results, 'Tr1b','WinRest');
-% path_fall = 'E:\Data\Aurelie\data\nocues\411582\230320_plane0\Fall.mat';
-path_fall = 'E:\Data\Aurelie\data\nocues\444119\220919_plane0\Fall.mat';
-load(path_fall, 'stat', 'iscell');
+% % path_folder = "E:\Data\Aurelie\analysis\March2026\nocues\test_stability\411582_230320_plane0_26_04_09_17_34_56";
+% path_folder = "E:\Data\Aurelie\analysis\April2026\nocues\assembly\444119_220922_plane0_26_04_21_08_22_36";
+% % path_folder = "E:\Data\Aurelie\analysis\March2026\nocues\test_stability\411582_230320_plane0_26_04_07_19_03_26";
+% % path_folder = "E:\Data\Aurelie\analysis\March2026\nocues\test_stability";
+% path_results = strcat(path_folder,'\K4\results.mat');  %path just to load Fluo +WinRest
+% % path_results = 'E:\Data\Aurelie\analysis\March2026\nocues\test_stability\411582_230320_plane0_26_04_06_17_17_46\K4\results.mat';
+% data_results = load(path_results, 'Tr1b','WinRest');
+% % path_fall = 'E:\Data\Aurelie\data\nocues\411582\230320_plane0\Fall.mat';
+% path_fall = 'E:\Data\Aurelie\data\nocues\444119\220922_plane0\Fall.mat';
+
+
+load(strcat(path_fall ,'Fall.mat'), 'stat', 'iscell');
 
 WinRest=data_results.WinRest;
 Traces_Temporelles = data_results.Tr1b; % Matrice [Nb_Neurones x Temps]
@@ -19,7 +20,7 @@ Traces_Temporelles = Traces_Temporelles (:,WinRest);
 
 %% test all clusters
 
-fichiers = dir(fullfile(path_folder, '**', 'results.mat'));
+fichiers = dir(fullfile(path, '**', 'results.mat'));
 
 max_ID = 0;
 nb_analyses = 0;
@@ -101,7 +102,7 @@ end
 % =========================================================================
 % AFFICHAGE DE LA MATRICE DE CONSENSUS
 % =========================================================================
-figure('Name', 'Consensus (Clusters Filtrés)', 'Color', 'w', 'Position', [100 100 700 600]);
+figure('Name', 'Consensus (Clusters Filtrés)', 'Color', 'w', 'Position', [100 100 700 600],Visible='off');
 imagesc(Matrice); 
 colormap('jet'); 
 colorbar; 
@@ -109,12 +110,11 @@ axis square;
 title(sprintf('Matrice de Consensus (Pénalisation active) - %d Neurones', max_ID), 'FontSize', 14);
 xlabel('ID Neurone', 'FontWeight', 'bold'); 
 ylabel('ID Neurone', 'FontWeight', 'bold');
-% namegraph=strcat(namefull,['rasterall' , '.png']);
-% 
-% if isfolder(namefull)
-%     exportgraphics(gcf,namegraph,'Resolution',150,'BackgroundColor','black')
-%     close gcf
-% end
+namegraph=strcat(path_save,['Consensus' , '.png']);
+
+exportgraphics(gcf,namegraph,'Resolution',150,'BackgroundColor','black')
+close gcf
+
 
 %%
 % % =========================================================================
@@ -203,7 +203,7 @@ Dist_A = 100 - Mat_A_propre; Dist_A(logical(eye(size(Dist_A)))) = 0;
 Z_A = linkage(squareform(Dist_A), 'average');
 
 % Obtenir le nouvel ordre
-figure('Visible', 'on');
+figure('Visible', 'off');
 [~, ~, ordre_A] = dendrogram(Z_A, 0); 
 
 close;
@@ -217,12 +217,10 @@ figure('Name', 'Consensus Tri Optimisé', 'Color', 'w', 'Position', [100 100 120
 imagesc(Matrice_A_triee_opt); colormap('jet'); colorbar; axis square;
 title('Consensus (Tri Optimisé)');
 
-% namegraph=strcat(namefull,['rasterall' , '.png']);
-% 
-% if isfolder(namefull)
-%     exportgraphics(gcf,namegraph,'Resolution',150,'BackgroundColor','black')
-%     close gcf
-% end
+namegraph=strcat(path_save,['Consensus_trié' , '.png']);
+
+exportgraphics(gcf,namegraph,'Resolution',150,'BackgroundColor','black')
+close gcf
 
 %%
 % =========================================================================
@@ -281,7 +279,7 @@ end
 % =========================================================================
 % AFFICHAGE
 % =========================================================================
-figure('Name', 'Séparation Bruit / Signal (Modèle Exponentiel)', 'Color', 'w', 'Position', [200 200 800 500]);
+figure('Name', 'Séparation Bruit / Signal (Modèle Exponentiel)', 'Color', 'w', 'Position', [200 200 800 500],Visible='off');
 
 % Histogramme original
 bar(bin_centers, counts, 'FaceColor', [0.2 0.4 0.6], 'EdgeColor', 'w');
@@ -307,6 +305,10 @@ title('Séparation Bruit / Signal (Déviation Exponentielle)', 'FontSize', 14);
 grid on;
 legend('Données réelles', 'Modèle du bruit théorique', 'Location', 'northeast');
 hold off;
+namegraph=strcat(path_save,['histo' , '.png']);
+
+exportgraphics(gcf,namegraph,'Resolution',150,'BackgroundColor','black')
+close gcf
 
 %%
 % =========================================================================
@@ -339,7 +341,7 @@ hold off;
 %%%%%%%%%%%%%%%
 % 3 : Extraction Robuste des Assemblées (Clustering Hiérarchique)
 % =========================================================================
- seuil_optimal=80;
+ seuil_optimal=robust_threshold;
 % 1. Définir le seuil (ex: 50%)
 Seuil_Core = seuil_optimal; 
 
@@ -424,7 +426,7 @@ end
 Matrice_Affichage(logical(eye(size(Matrice_Affichage)))) = 0;
 
 % Étape B : Création de la figure
-figure('Name', 'Réseau des Assemblées', 'Color', 'w', 'Position', [100, 100, 800, 600]);
+figure('Name', 'Réseau des Assemblées', 'Color', 'w', 'Position', [100, 100, 800, 600],Visible='off');
 
 % On crée le graphe uniquement avec les poids gardés
 Graphe_Visualisation = graph(Matrice_Affichage, 'upper');
@@ -462,6 +464,10 @@ end
 legend('Location', 'bestoutside');
 axis off; % Enlever les axes pour faire plus "réseau"
 hold off;
+namegraph=strcat(path_save,['Réseau des Assemblées Extraites' , '.png']);
+
+exportgraphics(gcf,namegraph,'Resolution',150,'BackgroundColor','black')
+close gcf
 
 %% chargement coordonnées cellules
 
@@ -624,7 +630,7 @@ Spearman_Moyen_Global = mean(valeurs_globales, 'omitnan');
 cols = ceil(sqrt(Nb_Assemblees));
 rows = ceil(Nb_Assemblees / cols);
 figure('Name', 'Assemblées et Corrélations Temporelles', ...
-       'Color', 'k', 'Position', [50 50 1400 900]);
+       'Color', 'k', 'Position', [50 50 1400 900],Visible='off');
 
 % 4. Boucle sur chaque assemblée (Dessin + Calcul local)
 for a = 1:Nb_Assemblees
@@ -680,22 +686,27 @@ end
 sgtitle('Réseaux spatiaux et Synchronisation Temporelle (Corrélation de Spearman)', ...
         'Color', 'w', 'FontSize', 16, 'FontWeight', 'bold');
 
+namegraph=strcat(path_save,['Assemblées_core' , '.png']);
+
+exportgraphics(gcf,namegraph,'Resolution',150,'BackgroundColor','black')
+close gcf
+
 % =========================================================================
 % 8 : Calcul du Meilleur K via results.mat + Cartographie
 % =========================================================================
 
 % 2. NOUVEAUX POIDS DU SCORE COMPOSITE
-w_sil        = 1%0.30;  % sil all clusters (séparation mathématique)
-w_assemblies = 0%0.10;  % Assemblies (quantité)
-w_recall     = 0%0.20;  % recall (SClok)
-w_sce        = 0%0.20;  % SCE_Purity
-w_cell       = 0%0.20;  % cell_Purity
+w_sil        = 0.30;  % sil all clusters (séparation mathématique)
+w_assemblies = 0.10;  % Assemblies (quantité)
+w_recall     = 0.20;  % recall (SClok)
+w_sce        = 0.20;  % SCE_Purity
+w_cell       = 0.20;  % cell_Purity
 
 % =========================================================================
 % ÉTAPE 1 : EXTRACTION DES MÉTRIQUES ET CALCUL DU BEST K
 % =========================================================================
 % fprintf('Analyse des dossiers K dans : %s\n', path_folder);
-dossiers_K = dir(fullfile(path_folder, '*K*')); 
+dossiers_K = dir(fullfile(path, '*K*')); 
 
 % Initialisation des listes
 Ks_list = []; Silh = []; Recall = []; CellSpec = []; SCEPurity = []; AssembliesCount = [];
@@ -801,7 +812,7 @@ Best_K = Ks_list(idx(1:1));
 for n =1:length(Best_K)
     knum=Best_K(n);
     % disp('Chargement des traces temporelles et des coordonnées pour ce Best K...');
-    dossier_best_k = strcat(path_folder, '\K' ,num2str(knum));
+    dossier_best_k = strcat(path, '\K' ,num2str(knum));
     fichier_best_k = strcat(dossier_best_k, '\results.mat');
     data_best = load(fichier_best_k, 'assemblyortho');
     
@@ -825,7 +836,7 @@ for n =1:length(Best_K)
     cols = ceil(sqrt(Nb_Assemblees)); rows = ceil(Nb_Assemblees / cols);
     couleurs = lines(Nb_Assemblees);
     
-    figure('Name', sprintf('Meilleur K = %d', knum), 'Color', 'k', 'Position', [50 50 1400 900]);
+    figure('Name', sprintf('Meilleur K = %d', knum), 'Color', 'k', 'Position', [50 50 1400 900],Visible='off');
     
     for a = 1:Nb_Assemblees
         subplot(rows, cols, a); hold on;
@@ -865,4 +876,8 @@ for n =1:length(Best_K)
     % Titre principal
     sgtitle(sprintf('Topologie au Meilleur K (K=%d )', knum), ...
             'Color', 'w', 'FontSize', 16, 'FontWeight', 'bold');
+    namegraph=strcat(path_save,['Assemblées_best' , '.png']);
+
+    exportgraphics(gcf,namegraph,'Resolution',150,'BackgroundColor','black')
+    close gcf
 end

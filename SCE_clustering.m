@@ -160,3 +160,64 @@ if NCl ==0
      assemblyortho= cell(0);
      assemblystat= cell(0);
 end
+
+%% ========================================================================
+%% EXTRACTION DES AMPLITUDES DES TRANSIENTS DANS LES SCE CLUSTERISÉS
+%% ========================================================================
+if NClOK > 0
+    % Initialisation du tableau de stockage :
+    % [Cluster_ID, SCE_Index, Cell_ID, Frame_Pic, Amplitude_DFF0]
+    Amplitudes_SCE_Clustered = []; 
+    
+    for c = 1:NClOK
+        idx_SCE_c = find(IDX2 == c); % Les indices des SCE du cluster 'c'
+        
+        for k = 1:length(idx_SCE_c)
+            current_sce_idx = idx_SCE_c(k);
+            sce_frame = TRace(current_sce_idx); 
+            
+            % Cellules actives dans CE SCE précis (grâce à votre matrice Race)
+            active_cells = find(Race(:, current_sce_idx) > 0);
+            
+            % Fenêtre locale exacte utilisée dans votre SCE_detection3 ([-1, +2])
+            idx_start = max(1, sce_frame - 1);
+            idx_end   = min(size(DFF0, 2), sce_frame + 2);
+            local_frames = idx_start:idx_end;
+            
+            for i = 1:length(active_cells)
+                cell_idx = active_cells(i);
+                
+                % 1. Trouver le frame exact du pic détecté via VOTRE Raster
+                active_frame_idx = find(Raster(cell_idx, local_frames) == 1, 1);
+                
+                if ~isempty(active_frame_idx)
+                    exact_peak_frame = local_frames(active_frame_idx);
+                    
+                    % 2. Extraire l'amplitude DFF0
+                    % Parfois le signal DFF0 brut peut avoir son vrai max décalé 
+                    % de 1 frame par rapport à Tr1b (si Tr1b est lissé/filtré). 
+                    % On cherche donc le max sur une micro-fenêtre de +/- 2 frames.
+                    win_micro = 2; 
+                    f_start = max(1, exact_peak_frame - win_micro);
+                    f_end   = min(size(DFF0, 2), exact_peak_frame + win_micro);
+                    
+                    [max_amp, ~] = max(DFF0(cell_idx, f_start:f_end));
+                    
+                    % 3. Stocker la donnée
+                    Amplitudes_SCE_Clustered = [Amplitudes_SCE_Clustered; ...
+                                                c, current_sce_idx, cell_idx, exact_peak_frame, max_amp];
+                end
+            end
+        end
+    end
+    
+    % Conversion en Table pour faciliter la visualisation (ex: boxplot)
+    if ~isempty(Amplitudes_SCE_Clustered)
+        AmpTable = array2table(Amplitudes_SCE_Clustered, ...
+            'VariableNames', {'ClusterID', 'SCE_Index', 'CellID', 'PeakFrame', 'Amplitude'});
+            
+        disp(['Extraction terminée. ', num2str(height(AmpTable)), ' transients extraits dans les clusters.']);
+    else
+        disp('Aucun transient trouvé dans les SCE clusterisés.');
+    end
+end
