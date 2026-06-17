@@ -1,8 +1,16 @@
 % 1. Lecture du fichier CSV ligne par ligne sous forme de tableau de chaînes (strings)
+clear
+
+% path="E:\Data\Aurelie\data\chroms\119\220923\registration\";
+path="E:\Data\Aurelie\data\chroms\582\230331plane0\";
+    % name="color_matched_biapy.csv";
+name="colorcell_exvivo_romain2026-06-17.csv";
 
 % strColors = readlines("E:\Data\Aurelie\data\chroms\119\220919\registration\colorcell_validated_for_prediction2.csv");
 % strColors = readlines("E:\Data\Aurelie\data\chroms\119\220923\registration\color_matched_biapy.csv");
-strColors = readlines("E:\Data\Aurelie\data\chroms\119\220919\registration\biapyJC2026_05_27.csv");
+
+strColors = readlines(strcat(path,name));
+
 %% 
 
 
@@ -26,3 +34,6 @@ colorcell(strColors == "black")   = 8;
 % 5. Affichage des 10 premières valeurs pour vérifier le résultat
 % disp('Aperçu des 10 premiers éléments de colorcell :');
 % disp(colorcell(1:10));
+save (strcat(path,'colorcell_exvivo_romain_20260617'),"colorcell")
+
+

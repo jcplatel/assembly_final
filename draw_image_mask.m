@@ -83,6 +83,9 @@ end
 axis off
 axis image
 hold off
+if image_to_show == 0 
+    axis xy
+end
 end
 
 

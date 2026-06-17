@@ -180,7 +180,8 @@ for file_num = files_to_process
         %raster_rastermap
         % path_colorcell="E:\Data\Aurelie\data\chroms\119\220923\registration\colorcell.mat"; 
         % path_colorcell="E:\Data\Aurelie\data\chroms\119\220919\registration\colorcell.mat"; 
-        path_colorcell="E:\Data\Aurelie\data\nocues\444119\220919_plane0\colorcell_Maxwell.mat"; 
+        path_colorcell="E:\Data\Aurelie\data\nocues\444119\220919_plane0\colorcell_Maxwell.mat";
+        
         if NCl>1
             save(strcat(namefull,'results.mat'), '-regexp', '^(?!(fig_log|ax|ax2|ax1|txt_log) $).');
             rastercolor
