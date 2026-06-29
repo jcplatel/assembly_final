@@ -46,7 +46,7 @@ for i = 1:length(channel_names)
 
     % c. Calcul des bornes (Robust Min-Max)
     val_min = min(vec_double);
-    val_max_99 = prctile(vec_double, 99.99);
+    val_max_99 = prctile(vec_double, 99.5);
     % val_min = prctile(vec_double, 1);
     % val_max_99 = prctile(vec_double, 99);
 

@@ -30,12 +30,13 @@ K = 10;
 Y_num = str2double(string(colorcell));
 
 % On recrée la variable catégorielle proprement avec les 8 couleurs
-classNames = {'rouge','vert','bleu','jaune','magenta','cyan','blanc','noir'};
+% classNames = {'rouge','vert','bleu','jaune','magenta','cyan','blanc','noir'};
+classNames = {'red','green','blue','yellow','magenta','cyan','white','black'};
 Ycat = categorical(Y_num, 1:8, classNames);
 Ycat_raw=Ycat;
 cell_IDs_original = (1:length(Ycat))';
 
-maskNoNoir = Ycat ~= 'noir';   % vecteur logique : true pour toutes les classes sauf noir
+maskNoNoir = Ycat ~= 'black';   % vecteur logique : true pour toutes les classes sauf noir
 % mask_noir   = (Ycat == 'noir');
 % mask_actifs = ~mask_noir;   % toutes les classes sauf noir
 X_filt   = X(maskNoNoir, :);   % features filtrées
@@ -48,6 +49,7 @@ mask_valide = ~any(isnan(X), 2) & ~any(isinf(X), 2);
 % 
 % On ne garde que les cellules valides
 X = X(mask_valide, :);
+% X = zscore(X);
 Ycat = Ycat(mask_valide);
 cell_IDs = cell_IDs(mask_valide);
 

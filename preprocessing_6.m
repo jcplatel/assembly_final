@@ -1,4 +1,4 @@
-function [Tr1b,speedsm,Raster,SumAct,MAct,Race,RasterRace,WinRest, WinActive,TRace,Fzero,DFF0,th_detection,bad_frames,max_cells_allowed,opts] = preprocessing_6(F,opts,speed,path,sampling_rate,namefull)
+function [Tr1b,speedsm,Raster,SumAct,MAct,Race,RasterRace,WinRest, WinActive,TRace,Fzero,DFF0,th_detection,bad_frames,max_cells_allowed,n_transients_total,opts] = preprocessing_6(F,opts,speed,path,sampling_rate,namefull)
 
 %% Load settings
 MinPeakDistancesce = opts.MinPeakDistancesce;      % 5 default

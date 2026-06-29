@@ -52,37 +52,70 @@ function [Race,SumAct,MAct,NRace,RasterRace,TRace, Raster,max_cells_allowed,opts
     % % 3. SHUFFLING (Local Jittering) ET CALCUL DU SEUIL STATISTIQUE
     % % =====================================================================
     % 
-    % Sumactsh = zeros(Nz - synchronous_frames, NShfl);   
-    % disp('Calcul du seuil statistique avec Local Jittering...');
-    % 
-    % for n = 1:NShfl
-    %     Rastersh = zeros(NCell, Nz); 
-    % 
-    %     % Local Jittering indépendant (Zéro-Padding aux extrémités)
-    %     for c = 1:NCell
-    %         k = randi([-max_jitter, max_jitter]);
-    %         if k > 0
-    %             Rastersh(c, k+1:end) = Raster(c, 1:end-k);
-    %         elseif k < 0
-    %             Rastersh(c, 1:end+k) = Raster(c, 1-k:end);
-    %         else
-    %             Rastersh(c, :) = Raster(c, :);
-    %         end
-    %     end
-    % 
-    %     % Calcul des co-activations du Shuffle avec la MÊME méthode que MAct
-    %     MActsh = zeros(1, Nz - synchronous_frames);
-    %     for i = 1:(Nz - synchronous_frames)
-    %         MActsh(i) = sum(max(Rastersh(:, i:i+synchronous_frames), [], 2));
-    %     end
-    % 
-    %     Sumactsh(:, n) = MActsh;
-    % end
-    % 
-    % % Détermination du seuil rigoureux sur les maximums pour contrer les artefacts
-    % % max_per_shuffle = max(Sumactsh, [], 1); 
-    % % sce_n_cells_threshold = ceil(prctile(max_per_shuffle, 95));
+    Sumactsh = zeros(Nz - synchronous_frames, NShfl);   
+    disp('Calcul du seuil statistique avec Local Jittering...');
+
+    parfor n = 1:NShfl
+        Rastersh = zeros(NCell, Nz); 
+
+        % Local Jittering indépendant (Zéro-Padding aux extrémités)
+        for c = 1:NCell
+            k = randi([-max_jitter, max_jitter]);
+            if k > 0
+                Rastersh(c, k+1:end) = Raster(c, 1:end-k);
+            elseif k < 0
+                Rastersh(c, 1:end+k) = Raster(c, 1-k:end);
+            else
+                Rastersh(c, :) = Raster(c, :);
+            end
+        end
+
+        % Calcul des co-activations du Shuffle avec la MÊME méthode que MAct
+        MActsh = zeros(1, Nz - synchronous_frames);
+        for i = 1:(Nz - synchronous_frames)
+            MActsh(i) = sum(max(Rastersh(:, i:i+synchronous_frames), [], 2));
+        end
+
+        Sumactsh(:, n) = MActsh;
+    end
+
+    % Détermination du seuil rigoureux sur les maximums pour contrer les artefacts
+    % max_per_shuffle = max(Sumactsh, [], 1); 
+    % sce_n_cells_threshold = ceil(prctile(max_per_shuffle, 95));
     % sce_n_cells_threshold = prctile(Sumactsh, 95, 'all');
+
+    % Toutes_valeurs_shuffles = Sumactsh(:);
+    % 
+    % % 2. CRUCIAL : On retire les zéros pour ne calculer la stat QUE sur les événements "actifs"
+    % Valeurs_actives_shuffles = Toutes_valeurs_shuffles(Toutes_valeurs_shuffles > 0);
+
+    % sce_n_cells_threshold = ceil(prctile(Valeurs_actives_shuffles, 95));
+    % 1. Extraire les valeurs actives du Shuffle
+    Toutes_valeurs_shuffles = Sumactsh(:);
+    Valeurs_actives_shuffles = Toutes_valeurs_shuffles(Toutes_valeurs_shuffles > 0);
+    % upper_trim = prctile(Valeurs_actives_shuffles, 99);
+    % Valeurs_actives_shuffles = Valeurs_actives_shuffles(Valeurs_actives_shuffles <= upper_trim);
+
+    % 2. Trier les valeurs de la plus petite à la plus grande
+    Valeurs_triees = sort(Valeurs_actives_shuffles);
+    
+    % 3. Appliquer une moyenne glissante (ex: fenêtre de 3)
+    Valeurs_lissees = movmean(Valeurs_triees, 3);
+    
+    % 4. Prendre le percentile sur cette distribution adoucie
+    % (Vous pouvez tester 99 ou 95)
+    sce_n_cells_threshold = ceil(prctile(Valeurs_lissees, 90));
+    
+    % 5. Garde-fou
+    min_cells_absolute = 5;
+    sce_n_cells_threshold = max(sce_n_cells_threshold, min_cells_absolute);
+    
+    % fprintf('--> Seuil retenu (Lissage + Percentile) : %d cellules\n', sce_n_cells_threshold);
+
+
+
+
+    opts.sce_n_cells_threshold = sce_n_cells_threshold;
     % fprintf('--> Seuil final retenu pour un SCE : %d cellules\n', sce_n_cells_threshold);
     
     % =====================================================================
@@ -98,28 +131,23 @@ function [Race,SumAct,MAct,NRace,RasterRace,TRace, Raster,max_cells_allowed,opts
     % =====================================================================
     % 5. CRÉATION DE LA MATRICE RACE (Extraction des cellules par SCE)
     % =====================================================================
-    Race = zeros(NCell, NRace);       % Race = cellules participant au SCE 
+   Race = zeros(NCell, NRace);       
     RasterRace = zeros(NCell, Nz);
     
-    % Fenêtre symétrique autour du pic du SCE (pour 10Hz, +/- 1 frame = fenêtre de 300ms globale)
-    window_radius = 1; 
-
     for i = 1:NRace
-        % Protection contre les bords de la matrice
-        idx_start = max(1, TRace(i) - 1);
-        idx_end   = min(Nz, TRace(i) + 2);
+        % On utilise EXACTEMENT la même fenêtre que celle qui a créé MAct
+        idx_start = TRace(i);
+        idx_end   = min(Nz, TRace(i) + synchronous_frames); 
         
-        % Identification des cellules actives dans la fenêtre du SCE
+        % Extraction de l'identité des cellules (le vecteur de 0 et de 1)
         Race(:, i) = max(Raster(:, idx_start:idx_end), [], 2);    
         
         % Placement du pic exact dans RasterRace
         for c = 1:NCell
             if Race(c, i) == 1
-                % Trouve la frame exacte du pic de cette cellule dans la fenêtre locale
                 local_frames = idx_start:idx_end;
                 active_frame = local_frames(Raster(c, local_frames) == 1);
                 
-                % Enregistre le premier pic trouvé dans la fenêtre
                 if ~isempty(active_frame)
                     RasterRace(c, active_frame(1)) = 1; 
                 end

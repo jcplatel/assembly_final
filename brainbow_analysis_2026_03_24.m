@@ -34,13 +34,9 @@ close all
 
 %% load path
 if ispc
-    % PathSave="E:\Data\Aurelie\analysis\March2026\nocues\test_stability\";
-    PathSave = "E:\Data\Aurelie\analysis\Mai2026\nocues\assembly\";
+    PathSave = "E:\Data\Aurelie\analysis\June2026\assembly\nocues\";
     load("E:\Data\Aurelie\data\nocues\nocues.mat");%PC
-    [path,name,ext] = fileparts(filename);
-    if strlength(name)> 23; identifier = extractBetween(name,5,24);else identifier='suite2p';end
-    id_propre = strrep(identifier, '_', '-'); 
-    daytime = datestr(now,'yy_mm_dd_HH_MM_SS');
+
     % load("E:\Data\Aurelie\data\nwb_file\listnwb.mat");
     % load("E:\Data\Aurelie\data\cues\cues.mat")
 elseif ismac
@@ -49,7 +45,7 @@ elseif ismac
 end
 
 %% 2. PRÉPARATION DU JOURNAL (LOGS ET UI)
-fig_log = uifigure('Name', 'Journal de Traitement', 'Position', [500, 300, 500, 400]);
+fig_log = uifigure('Name', 'Journal de Traitement', 'Position', [500, 300, 500, 400], 'Visible', 'on');
 txt_log = uitextarea(fig_log, 'Position', [20, 20, 460, 360], 'Editable', 'off', 'FontName', 'Consolas'); 
 
 log_file = fullfile(PathSave, sprintf('log_analyse_%s.txt', datestr(now, 'yy_mm_dd_HH_MM')));
@@ -59,13 +55,18 @@ historique = {};
 historique = ecrire_log(txt_log, log_file, historique, sprintf('=== DÉBUT DE L''ANALYSE : %s ===', datestr(now)));
 temps_global = tic;
 
-files_to_process =22;%  [1:3,23:30];%1:numel (matfile) 
+files_to_process =1:numel (matfile) ;%22;%  [1:3,23:30];%1:numel (matfile) 
 
 for file_num = files_to_process
     temps_fichier = tic; 
     % try
     close all
     filename=string(matfile{file_num});
+    [path,name,ext] = fileparts(filename);
+    if strlength(name)> 23; identifier = extractBetween(name,5,24);else identifier='suite2p';end
+    id_propre = strrep(identifier, '_', '-'); 
+    daytime = datestr(now,'yy_mm_dd_HH_MM_SS');
+
     path =strcat(path ,'\');%pc
     namefull = strcat(PathSave ,identifier ,'_',daytime  ,'\');%pc
     mkdir (namefull) ;
@@ -91,7 +92,7 @@ for file_num = files_to_process
    opts = struct(...
         'MinPeakDistancesce', 5, ...
         'MinPeakDistance', 3, ...
-        'threshold_peak', 2.33, ...
+        'threshold_peak', 3.09, ...
         'synchronous_frames', 1, ...
         'sce_n_cells_threshold', 10, ...
         'SG_window', 7, ...
@@ -109,12 +110,13 @@ for file_num = files_to_process
 
     %% Pre-processing: cell extraction, denoising, normalisation, baseline substraction, find SCE
  [Tr1b,speedsm,Raster,SumAct,MAct,Race,RasterRace,WinRest, WinActive,...
-        TRace,Fzero,Fdetrend,th_detection,bad_frames,max_cells_allowed,opts] = ...
+        TRace,Fzero,DFF0,th_detection,bad_frames,max_cells_allowed,n_transients_total,opts] = ...
         preprocessing_6(F,opts,speed,path,sampling_rate,namefull);
-
 
     [NCell, Nz] = size(Tr1b);
     find_ncluster = false;
+    % opts.sce_n_cells_threshold
+    % numel(TRace)
 
     %%find best K
     if find_ncluster == true 
@@ -154,7 +156,7 @@ for file_num = files_to_process
         [~, idx_S]     = max(best_S);
         NClini = [NClini, idx_NCl, idx_SClOK, idx_S]; NClinit = unique(NClini, 'stable');
     else 
-        NClinit = 3:20;% 5:2:18;[8, 15]
+        NClinit = 4:15;% 5:2:18;[8, 15]
     end
 
     namefullold = namefull;
@@ -163,13 +165,16 @@ for file_num = files_to_process
 
         NClini=nanalysis;
 
-        namefull = strcat (namefullold,'/','k',num2str(nanalysis),'/');
+        namefull = strcat (namefullold,'k',num2str(nanalysis),'\');
         mkdir (namefull) ;   % make folder for saving analysis
 
-        kmean_iter=1000; kmeans_surrogate=100; kmeans_rnd_iter=100;savefig=1;
+        kmean_iter=100; kmeans_surrogate=100; kmeans_rnd_iter=20;savefig=1;
         % kmean_iter = 100;kmeans_surrogate = 50;kmeans_rnd_iter = 10;savefig=1;
         SCE_clustering
-        
+        % results = biclustering_assemblies(Race, DFF0, TRace);
+        % plot_bicluster_race(Race, results, namefull);
+        % plot_bicluster_race_colored(Race, results, namefull);
+        inertia_all(NClini)=mean(inertia);
         clear fig 
         exportdata
 
@@ -180,7 +185,8 @@ for file_num = files_to_process
         %raster_rastermap
         % path_colorcell="E:\Data\Aurelie\data\chroms\119\220923\registration\colorcell.mat"; 
         % path_colorcell="E:\Data\Aurelie\data\chroms\119\220919\registration\colorcell.mat"; 
-        path_colorcell="E:\Data\Aurelie\data\nocues\444119\220919_plane0\colorcell_Maxwell.mat";
+        % path_colorcell="E:\Data\Aurelie\data\nocues\444119\220919_plane0\colorcell_Maxwell.mat";
+        path_colorcell=strcat(path,"colorcell_Maxwell.mat");
         
         if NCl>1
             save(strcat(namefull,'results.mat'), '-regexp', '^(?!(fig_log|ax|ax2|ax1|txt_log) $).');
@@ -189,7 +195,7 @@ for file_num = files_to_process
             brainbowassemblies2026_05_07
             distance_calculation
             export_data_brainbow
-            save(strcat(namefull,'brainbow.mat') )
+            save(strcat(namefull,'brainbow.mat'))
         end
 
     end

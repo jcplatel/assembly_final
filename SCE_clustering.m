@@ -3,7 +3,7 @@
 assemblyraw = [];
 NRace= size(Race,2);
 
-[IDX2,sCl,M,S,NClini] = kmeansoptnew(Race, kmean_iter, 'var', NClini,[]);
+[IDX2,sCl,M,S,NClini,inertia] = kmeansoptnew(Race, kmean_iter, 'var', NClini,[]);
 NCl = NClini;
 
 [~,x2] = sort(IDX2); % cluster de SCE

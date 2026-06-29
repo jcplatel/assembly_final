@@ -18,7 +18,6 @@ function [DFF0, Fzero] = baseline_calculation_glissante2(Tr1b, bad_frames, sampl
     end
     num_steps = length(centers);
     
-    % Initialisation des matrices de sortie (pour la rapidité)
     DFF0 = zeros(NCell, Nz);
     Fzero = zeros(NCell, Nz);
     

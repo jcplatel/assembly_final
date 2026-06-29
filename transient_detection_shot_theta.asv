@@ -52,38 +52,38 @@ end
 %     end
 % end
 
-% cellules_choisies = randperm(NCell, 10);
-% 
-% for i=cellules_choisies
-%     figure(Visible='off');
-%     plot(Tr1b(i, :), 'b-', 'LineWidth', 1.2);
-%     hold on;
-%     pics_x = Acttmp2{i}; 
-%     plot( pics_x, Tr1b(i, pics_x), 'ro', 'MarkerSize', 5, 'MarkerFaceColor', 'r');
-%     yline(th_detection(i),'Color','red')
-%     title (['cellule' , num2str(i)])
-%     hold off
-%     % yyaxis right
-%     % % plot (speed)
-%     % fenetre=zeros(1,Nz);
-%     % fenetre(WinRest)=1;
-%     % plot (fenetre)
-%     %color coding rest period
-%     y_lims = ylim;
-%     y_min = y_lims(1);
-%     y_max = y_lims(2);
-%     is_active=ones(1,Nz);
-%     is_active(WinRest)=0;
-%     transitions = diff([0, is_active, 0]);
-%     debuts = find(transitions == 1);
-%     fins = find(transitions == -1) - 1;
-%     X_rect = [debuts; debuts; fins; fins];
-%     Y_rect = repmat([y_min; y_max; y_max; y_min], 1, length(debuts));
-%     hold on;
-%     p = patch(X_rect, Y_rect, [1, 0.8, 0.8], 'EdgeColor', 'none');
-%     p.FaceAlpha = 0.4;
-%     uistack(p, 'bottom');
-% 
-%     exportgraphics(gcf,strcat(namefull, 'trace_cell_', num2str(i), '.png'),'Resolution',300)
-%     close gcf
-% end
+cellules_choisies = randperm(NCell, 10);
+
+for i=cellules_choisies
+    figure(Visible='off');
+    plot(Tr1b(i, :), 'b-', 'LineWidth', 1.2);
+    hold on;
+    pics_x = Acttmp2{i}; 
+    plot( pics_x, Tr1b(i, pics_x), 'ro', 'MarkerSize', 5, 'MarkerFaceColor', 'r');
+    yline(th_detection(i),'Color','red')
+    title (['cellule' , num2str(i)])
+    hold off
+    % yyaxis right
+    % % plot (speed)
+    % fenetre=zeros(1,Nz);
+    % fenetre(WinRest)=1;
+    % plot (fenetre)
+    %color coding rest period
+    y_lims = ylim;
+    y_min = y_lims(1);
+    y_max = y_lims(2);
+    is_active=ones(1,Nz);
+    is_active(WinRest)=0;
+    transitions = diff([0, is_active, 0]);
+    debuts = find(transitions == 1);
+    fins = find(transitions == -1) - 1;
+    X_rect = [debuts; debuts; fins; fins];
+    Y_rect = repmat([y_min; y_max; y_max; y_min], 1, length(debuts));
+    hold on;
+    p = patch(X_rect, Y_rect, [1, 0.8, 0.8], 'EdgeColor', 'none');
+    p.FaceAlpha = 0.4;
+    uistack(p, 'bottom');
+
+    exportgraphics(gcf,strcat(namefull, 'trace_cell_', num2str(i), '.fig'),'Resolution',300)
+    close gcf
+end

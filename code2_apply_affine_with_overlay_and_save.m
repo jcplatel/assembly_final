@@ -2,13 +2,17 @@
 % clear; clc; close all;
 % --- Paramètres ---
 path_chroms = "E:\Data\Aurelie\data\chroms\175\221125plane0\";
-path_tif_exvivo = "E:\Data\Aurelie\data\chroms\175\exvivo_rotated.tif"; % REMPLACER par le vrai chemin
-path_tif_invivo = strcat(path_chroms,"invivo.tif"); % REMPLACER par le vrai chemin
-radius_z = 10; % nombre de plans à extraire autour du plan moyen
+path_tif_exvivo = "E:\Data\Aurelie\data\chroms\175\exvivo_rotated.tif"; 
+path_tif_invivo = strcat(path_chroms,"invivo.tif");
+% path_chroms = "E:\Data\Aurelie\data\chroms\582\230331plane0\";
+% path_tif_exvivo = "E:\Data\Aurelie\data\chroms\582\exvivo.tif"; 
+% path_tif_invivo = "E:\Data\Aurelie\data\chroms\582\230331plane0\old\230331_plan0_compositecalcium.tif"; % REMPLACER par le vrai chemin
+
+radius_z = 14; % nombre de plans à extraire autour du plan moyen
 canal_a_afficher = 2; % 2 pour le vert (GCaMP)
-out_tif_volume = strcat(path_chroms,"exvivo_warped_subvolume.tif");
+out_tif_volume = strcat(path_chroms,"exvivo_warped_subvolumegood.tif");
 out_tif_overlay = strcat(path_chroms,"overlay_invivo_exvivo.tif");
-out_tif_volume_sum2 = strcat(path_chroms,"exvivo_warped_subvolume_sum2.tif"); % NOUVEAU
+out_tif_volume_sum2 = strcat(path_chroms,"exvivo_warped_subvolume_sum2good.tif"); % NOUVEAU
 
 % Chargement de la matrice et des profondeurs Z
 % load('registration_affine_2D.mat', 'tform', 'Z_ex');
@@ -97,7 +101,7 @@ fprintf('\n=== Création du volume avec somme de 2 plans consécutifs ===\n');
 
 % Nombre de plans après somme de 2: si nb_z_utiles est impair, on garde le dernier plan seul
 nb_z_sum2 = floor(nb_z_utiles / 2);
-a_garde_dernier = (nb_z_utiles % 2) == 1;
+a_garde_dernier = mod(nb_z_utiles, 2) == 1;
 
 % On crée un volume uint16 pour la somme (pas de overflow avec uint16 pour 2 plans)
 Volume_Warped_Sum2 = zeros(outH, outW, nb_z_sum2 + a_garde_dernier, num_channels, 'uint16');

@@ -1,14 +1,21 @@
 %% 2. Application de la matrice au volume Ex-vivo, Superposition et Sauvegarde TIF
 % clear; clc; close all;
+
 % --- Paramètres ---
-path_chroms = "E:\Data\Aurelie\data\chroms\175\221125plane0\";
-path_tif_exvivo = "E:\Data\Aurelie\data\chroms\175\exvivo_rotated.tif"; % REMPLACER par le vrai chemin
-path_tif_invivo = strcat(path_chroms,"invivo.tif"; % REMPLACER par le vrai chemin
-radius_z = 10; % nombre de plans à extraire autour du plan moyen
+% path_chroms = "E:\Data\Aurelie\data\chroms\175\221125plane0\";
+
+path_csv_invivo = "E:\Data\Aurelie\data\chroms\582\230331plane0\old\Pointage_Manuel_invivo.csv";
+path_csv_exvivo = "E:\Data\Aurelie\data\chroms\582\230331plane0\old\Pointage_Manuel_exvivo.csv";
+
+% path_tif_exvivo = "E:\Data\Aurelie\data\chroms\175\exvivo_rotated.tif"; 
+path_tif_exvivo = "E:\Data\Aurelie\data\chroms\582\exvivo.tif"; %
+
+
+radius_z = 14; % nombre de plans à extraire autour du plan moyen
 canal_a_afficher = 2; % 2 pour le vert (GCaMP)
-out_tif_volume = 'E:\Data\Aurelie\data\chroms\582\exvivo_warped_subvolume.tif';
-out_tif_overlay = 'E:\Data\Aurelie\data\chroms\582\230331plane0\overlay_invivo_exvivo.tif';
-out_tif_volume_sum2 = 'E:\Data\Aurelie\data\chroms\582\exvivo_warped_subvolume_sum2.tif'; % NOUVEAU
+out_tif_volume = strcat(path_chroms,"exvivo_warped_subvolume.tif");
+out_tif_overlay = strcat(path_chroms,"overlay_invivo_exvivo.tif");
+out_tif_volume_sum2 = strcat(path_chroms,"exvivo_warped_subvolume_sum2.tif"); % NOUVEAU
 
 % Chargement de la matrice et des profondeurs Z
 % load('registration_affine_2D.mat', 'tform', 'Z_ex');
@@ -77,29 +84,56 @@ subplot(1,3,1); imshow(img_in_adj); title('In vivo');
 subplot(1,3,2); imshow(img_ex_adj); title('Ex vivo Warped (MIP)');
 subplot(1,3,3); imshow(overlay_rgb); title('Overlay (Vert=In, Magenta=Ex)');
 
-% --- Sauvegarde du Volume 3D en Multi-page TIF ---
+% --- Sauvegarde du Volume 3D en Multi-page TIF (Format ImageJ) ---
 fprintf('Sauvegarde du volume 3D aligné sous : %s\n', out_tif_volume);
+
 if isfile(out_tif_volume)
-    delete(out_tif_volume); % On supprime l'ancien pour ne pas append à l'infini
+    delete(out_tif_volume); % On supprime l'ancien
 end
 
+% Métadonnées ImageJ pour forcer la lecture en (Z, C, Y, X)
+total_images = nb_z_utiles * num_channels;
+ij_desc = sprintf('ImageJ=1.53c\nimages=%d\nchannels=%d\nslices=%d\nhyperstack=true\nmode=composite', ...
+    total_images, num_channels, nb_z_utiles);
+
+t = Tiff(out_tif_volume, 'w');
+tagstruct.ImageLength = outH;
+tagstruct.ImageWidth = outW;
+tagstruct.Photometric = Tiff.Photometric.MinIsBlack;
+tagstruct.BitsPerSample = 16;
+tagstruct.SamplesPerPixel = 1;
+tagstruct.PlanarConfiguration = Tiff.PlanarConfiguration.Chunky;
+
+page = 1;
 for z = 1:nb_z_utiles
     for c = 1:num_channels
-        imwrite(Volume_Warped(:, :, z, c), out_tif_volume, 'WriteMode', 'append', 'Compression', 'none');
+        if page == 1
+            tagstruct.ImageDescription = ij_desc;
+        elseif isfield(tagstruct, 'ImageDescription')
+            tagstruct = rmfield(tagstruct, 'ImageDescription');
+        end
+        
+        t.setTag(tagstruct);
+        t.write(Volume_Warped(:, :, z, c));
+        
+        if page < total_images
+            t.writeDirectory();
+        end
+        page = page + 1;
     end
 end
+t.close();
+disp('Volume 3D original sauvegardé avec métadonnées ImageJ !');
 
-disp('Volume 3D original sauvegardé !');
 save('exvivo_warped_subvolume.mat', 'Volume_Warped', 'Exvivo_MIP', 'z_min', 'z_max', 'z_ref', '-v7.3');
+
 
 %% === NOUVEAU : Volume avec somme de 2 plans consécutifs ===
 fprintf('\n=== Création du volume avec somme de 2 plans consécutifs ===\n');
 
-% Nombre de plans après somme de 2: si nb_z_utiles est impair, on garde le dernier plan seul
 nb_z_sum2 = floor(nb_z_utiles / 2);
-a_garde_dernier = (nb_z_utiles % 2) == 1;
+a_garde_dernier = mod(nb_z_utiles, 2) == 1;
 
-% On crée un volume uint16 pour la somme (pas de overflow avec uint16 pour 2 plans)
 Volume_Warped_Sum2 = zeros(outH, outW, nb_z_sum2 + a_garde_dernier, num_channels, 'uint16');
 
 fprintf('Somme de 2 plans consécutifs : %d plans originaux → %d plans sommé2\n', ...
@@ -113,9 +147,8 @@ for z_idx = 1:nb_z_sum2
         slice1 = Volume_Warped(:, :, z1, c);
         slice2 = Volume_Warped(:, :, z2, c);
         
-        % Somme de 2 plans (uint16 → pas de overflow pour 2 plans)
+        % Somme de 2 plans 
         slice_sum = slice1 + slice2;
-        
         Volume_Warped_Sum2(:, :, z_idx, c) = slice_sum;
     end
 end
@@ -130,7 +163,7 @@ end
 
 disp('Volume sommé2 créé !');
 
-% --- Sauvegarde du Volume 3D sommé2 en Multi-page TIF ---
+% --- Sauvegarde du Volume 3D sommé2 en Multi-page TIF (Format ImageJ) ---
 fprintf('Sauvegarde du volume 3D sommé2 sous : %s\n', out_tif_volume_sum2);
 
 if isfile(out_tif_volume_sum2)
@@ -138,19 +171,45 @@ if isfile(out_tif_volume_sum2)
 end
 
 nb_z_final = nb_z_sum2 + a_garde_dernier;
+total_images_sum2 = nb_z_final * num_channels;
 
+ij_desc_sum2 = sprintf('ImageJ=1.53c\nimages=%d\nchannels=%d\nslices=%d\nhyperstack=true\nmode=composite', ...
+    total_images_sum2, num_channels, nb_z_final);
+
+t2 = Tiff(out_tif_volume_sum2, 'w');
+tagstruct2.ImageLength = outH;
+tagstruct2.ImageWidth = outW;
+tagstruct2.Photometric = Tiff.Photometric.MinIsBlack;
+tagstruct2.BitsPerSample = 16;
+tagstruct2.SamplesPerPixel = 1;
+tagstruct2.PlanarConfiguration = Tiff.PlanarConfiguration.Chunky;
+
+page = 1;
 for z = 1:nb_z_final
     for c = 1:num_channels
-        imwrite(Volume_Warped_Sum2(:, :, z, c), out_tif_volume_sum2, 'WriteMode', 'append', 'Compression', 'none');
+        if page == 1
+            tagstruct2.ImageDescription = ij_desc_sum2;
+        elseif isfield(tagstruct2, 'ImageDescription')
+            tagstruct2 = rmfield(tagstruct2, 'ImageDescription');
+        end
+        
+        t2.setTag(tagstruct2);
+        t2.write(Volume_Warped_Sum2(:, :, z, c));
+        
+        if page < total_images_sum2
+            t2.writeDirectory();
+        end
+        page = page + 1;
     end
 end
+t2.close();
 
-disp('Volume 3D sommé2 sauvegardé !');
+disp('Volume 3D sommé2 sauvegardé avec métadonnées ImageJ !');
 
 % Sauvegarde du MAT pour le volume sommé2
-save('exvivo_warped_subvolume_sum2.mat', 'Volume_Warped_Sum2', 'nb_z_sum2', 'a_garde_dernier', '-v7.3');
+save('exvivo_warped_subvolume_sum.mat', 'Volume_Warped_Sum2', 'nb_z_sum2', 'a_garde_dernier', '-v7.3');
 
-fprintf('=== Tout est terminé et sauvegardé ! ===\n');
+fprintf('\n=== Tout est terminé et sauvegardé ! ===\n');
 fprintf('- Volume original : %s\n', out_tif_volume);
 fprintf('- Volume sommé2   : %s\n', out_tif_volume_sum2);
 fprintf('- Overlay         : %s\n', out_tif_overlay);
