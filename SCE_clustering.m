@@ -10,17 +10,13 @@ NCl = NClini;
 MSort = M(x2,x2);
 
 %% Remove cluster non-statistically significant
-% (Le reste de ton code reste identique car il travaille sur IDX2 et M)
-% ...
+
 sClrnd = zeros(1,kmeans_surrogate);
-% cRace = parallel.pool.Constant(Race); % Toujours utiliser les vraies données pour le shuffle
-cRace = parallel.pool.Constant(Race); % Toujours utiliser les vraies données pour le shuffle
+cRace = parallel.pool.Constant(Race);
 
 All_Shuffle_Scores = [];
 
 parfor i = 1:kmeans_surrogate  
-    % Attention : ici on utilise toujours la fonction shuffle standard
-    % car faire du consensus clustering DANS le shuffle serait trop long
     scores_du_run = kmeansoptrndnew(cRace.Value, kmeans_rnd_iter, NCl);
     All_Shuffle_Scores = [All_Shuffle_Scores, scores_du_run]; 
 end
@@ -69,7 +65,7 @@ if NCl>1
     MSort_sorted_ok = MSort_ok(sort_idx, sort_idx);
     
     % Calcul de la silhouette
-    s = silh(MSort_sorted_ok, IDX2_sorted_ok);
+    s = silhouette(MSort_sorted_ok, IDX2_sorted_ok);
     
     sClOK = zeros(1, NCl);
     for i = 1:NCl

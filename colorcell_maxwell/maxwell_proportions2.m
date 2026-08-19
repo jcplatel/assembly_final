@@ -8,9 +8,9 @@ R_clean = max(0, R_corr - bg_R);
 G_clean = max(0, G_corr - bg_G);
 B_clean = max(0, B_corr - bg_B);
 
-Rmax = prctile(R_clean(R_clean > 0), 99);
-Gmax = prctile(G_clean(G_clean > 0), 99);
-Bmax = prctile(B_clean(B_clean > 0), 99);
+Rmax = prctile(R_clean(R_clean > 0), 99.9);
+Gmax = prctile(G_clean(G_clean > 0), 99.9);
+Bmax = prctile(B_clean(B_clean > 0), 99.9);
 
 R_clean = R_clean ./ max(Rmax, eps);
 G_clean = G_clean ./ max(Gmax, eps);
@@ -30,4 +30,5 @@ Xtri = r + 0.5*b;
 Ytri = (sqrt(3)/2) * b;
 
 Donnees_Clustering = [Xtri, Ytri];
+
 end

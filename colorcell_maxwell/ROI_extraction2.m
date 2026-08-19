@@ -1,4 +1,4 @@
-function [R,G,B,Ca,Coomasqx,Coomasqy,Coox,Cooy] = ROI_extraction2(path, aligned_red, aligned_green, aligned_blue, calcium_norm)
+function [R,G,B,Ca,Coomasqx,Coomasqy,Coox,Cooy,outline_gcampx,outline_gcampy] = ROI_extraction2(path, aligned_red, aligned_green, aligned_blue, calcium_norm)
 
 load(fullfile(path, 'Fall.mat'),'stat','iscell');
 

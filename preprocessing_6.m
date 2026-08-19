@@ -11,7 +11,7 @@ motion_correction=opts.motion_correction;%false
 colorsubstraction=opts.colorsubstraction;%false
 
 %% import Fluo
- Tr1b=double(F);
+ Tr1b=single(F);
 
 %% correct for motion artifact
 if ~isfile(strcat(path, 'Fall.mat')); motion_correction = false ;end

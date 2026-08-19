@@ -56,11 +56,12 @@ function [roi_corrected, k_estime, b_estime] = bleedthrough_correction(roi_color
         b_estime = min(y_min); % Le fond devient juste le min global
     end
     
+    
     fprintf('Fuite GCaMP (k) : %.3f | Bruit (b) : %.3f\n', k_estime, b_estime);
 
     % 6. Affichage
     if graph == 1
-        figure('Name', 'Correction Bleedthrough', 'Color', 'w');
+        figure('Name', 'Correction Bleedthrough', 'Color', 'w',Visible='off');
         scatter(roi_ca, roi_color, 30, [0.7 0.7 0.7], 'o'); hold on;
         scatter(x_fit, y_fit, 80, 'k', 'filled'); % Affiche uniquement les points gardés
         

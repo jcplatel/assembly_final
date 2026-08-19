@@ -1,7 +1,7 @@
 function [R, G, B, id_low_intensity,I] = removal_low_intensities2(R, G, B, seuil_manuel)
     % Calcule l'intensité globale (Norme euclidienne)
-    I = sqrt(R.^2 + G.^2 + B.^2);
-    
+    % I = sqrt(R.^2 + G.^2 + B.^2);
+    I = max([R, G, B], [], 2);
     if nargin < 4 || isempty(seuil_manuel)
         % MODE OTSU AUTOMATIQUE (silencieux)
         % graythresh attend des valeurs entre 0 et 1.

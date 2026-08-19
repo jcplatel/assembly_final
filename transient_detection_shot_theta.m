@@ -84,6 +84,6 @@ end
 %     p.FaceAlpha = 0.4;
 %     uistack(p, 'bottom');
 % 
-%     exportgraphics(gcf,strcat(namefull, 'trace_cell_', num2str(i), '.png'),'Resolution',300)
+%     exportgraphics(gcf,strcat(namefull, 'trace_cell_', num2str(i), '.png'),'Resolution',300, 'ContentType', 'image')
 %     close gcf
 % end
