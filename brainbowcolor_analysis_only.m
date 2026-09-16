@@ -6,7 +6,6 @@ dossier_mere = "E:\Data\Aurelie\analysis\Final\assembly\cues\";
 tous_les_fichiers = dir(fullfile(dossier_mere, '**', 'results.mat'));
 %% 
 
-
 for file_num = 1:length(tous_les_fichiers)
     % try
     path_results = fullfile(tous_les_fichiers(file_num).folder, tous_les_fichiers(file_num).name);
@@ -21,7 +20,7 @@ for file_num = 1:length(tous_les_fichiers)
     identifier = extractBefore(sessionName, indices(3));
 
     [path_folder,name,ext] = fileparts(path_results);
-    load(path_results,'path','assemblyortho','Nz','NCl','NClOK','mean_sClOK','daytime','NRace','freqsce','NRaceOK','freqsceok',...
+    load(path_results,'Tr1b','speed','path','assemblyortho','Nz','NCl','NClOK','mean_sClOK','daytime','NRace','freqsce','NRaceOK','freqsceok',...
         'sCl','sClOK','idortho','mean_cell_assembly','sampling_rate','WinRest','WinActive','average_speed',...
         'max_speed', 'nb_lap', 'sce_n_cells_threshold', 'mean_distance_assembly','kmeans_surrogate','NClini',...
         'PathSave')
@@ -32,6 +31,7 @@ for file_num = 1:length(tous_les_fichiers)
     else 
         path_colorcell=strcat(path,"colorcell_Maxwell.mat");
     end
+    savefig=1;
     % if file_num == 21 || file_num == 26 || file_num == 49
     %     path_colorcell=strcat(path,"colorcell_GT.mat");
     % end% 

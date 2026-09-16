@@ -37,7 +37,8 @@ NRaceOK = size(RaceOK,2);
 
 
 if NClOK>1
-     RACE_Orthojcnew2
+     % RACE_Orthojcnew2
+     RACEORTHO_FDR
      NClOK=NCl;
      %%call rasterplot here
 else

@@ -1,49 +1,43 @@
-function [Raster,Acttmp2,th_detection,BurstMask] = transient_detection_shot_theta (Tr1b,MinPeakDistancesce,MinPeakDistance,threshold_peak,WinRest,WinActive,DFF0,namefull,Fzero)
+function [Raster, Acttmp2, th_detection, BurstMask, PromALL,WidthALL] = ...
+    transient_detection_shot_theta(Tr1b, MinPeakDistance, threshold_peak, WinRest, DFF0, namefull, Fzero)
 
 [NCell, Nz] = size(Tr1b);
-Raster = zeros(NCell,Nz);
-Acttmp2 = cell(1,NCell);
-ampALL  = cell(1,NCell);
+Raster = zeros(NCell, Nz);
+Acttmp2 = cell(1, NCell);
+ampALL  = cell(1, NCell);
+PromALL = cell(1, NCell);  
+WidthALL = cell(1, NCell); 
 th_detection = zeros(1, NCell);
+BurstMask = false(NCell, Nz);
 fenetre_correction = 400; 
 
-for i=1:NCell     
-    noise= 1.4826 * mad(diff(DFF0(i, WinRest)),1)/ sqrt(2);%0 for mean absolute deviation 1 for median
-    th_detection(i)= threshold_peak * noise ;%default=2.33
-    % baseline_locale = movmedian(Tr1b(i, :), fenetre_correction);
-    % Tr1b_plate = Tr1b(i, :) - baseline_locale;
-    [amplitude, locs] = findpeaks(Tr1b(i, :),...
-    'MinPeakHeight', th_detection(i), ...
-    'MinPeakProminence', th_detection(i)*0.8, ...
-    'MinPeakDistance', MinPeakDistance);
-
+for i = 1:NCell     
+    noise = 1.4826 * mad(diff(DFF0(i, WinRest)), 1) / sqrt(2);
+    th_detection(i) = threshold_peak * noise;
+    
+    [amplitude, locs, w, p] = findpeaks(Tr1b(i, :), ...
+        'MinPeakProminence', th_detection(i), ...
+        'MinPeakDistance', MinPeakDistance);
+    
     peaks_Rest = ismember(locs, WinRest);
-    locs_in_rest = locs(peaks_Rest);
+    locs_in_rest      = locs(peaks_Rest);
     amplitude_in_rest = amplitude(peaks_Rest);
-
+    prom_in_rest      = p(peaks_Rest);
+    width_in_rest     = w(peaks_Rest);
+    
     F0_median = median(Fzero(i, :), 'omitnan');
-    F0_iqr = iqr(Fzero(i, :));
+    F0_iqr    = iqr(Fzero(i, :));
+    ThBurst_F0 = F0_median + F0_iqr;
+    BurstMask(i, :) = Fzero(i, :) >= ThBurst_F0;
     
-    % % Seuil de Burst : par exemple, Médiane + 2 IQR 
-    % ThBurst_F0 = F0_median + F0_iqr; 
-    % BurstMask(i, :) = Fzero(i, :) >= ThBurst_F0;
-    % 
-    % % On filtre les locs : on ne garde le pic que si le Fzero à cet instant
-    % % est inférieur au seuil de Burst.
-    % valid_non_burst = Fzero(i, locs_in_rest) < ThBurst_F0;
-    % 
-    % % Appliquer le filtre
-    % locs_in_rest = locs_in_rest(valid_non_burst);
-    % amplitude_in_rest = amplitude_in_rest(valid_non_burst);
-    % % ========================================================
-    
-    % 5. Enregistrement final
-    % ampALL{i} = amplitude_in_rest;
-    % Acttmp2{i} = locs_in_rest;
-    % Raster(i, locs_in_rest) = 1;
-    ampALL{i} = amplitude_in_rest;
+    % Enregistrement final
+    ampALL{i}  = amplitude_in_rest;  % hauteur brute du sommet (si besoin un jour)
+    PromALL{i} = prom_in_rest;       % proéminence nette (à utiliser pour l'analyse d'amplitude)
     Acttmp2{i} = locs_in_rest;
+    WidthALL{i} = width_in_rest; 
     Raster(i, locs_in_rest) = 1;
+end
+
 end
 
 % for i = 1:NCell
@@ -84,6 +78,6 @@ end
 %     p.FaceAlpha = 0.4;
 %     uistack(p, 'bottom');
 % 
-%     exportgraphics(gcf,strcat(namefull, 'trace_cell_', num2str(i), '.png'),'Resolution',300, 'ContentType', 'image')
+%                 exportgraphics(gcf,strcat(namefull, 'trace_cell_', num2str(i), '.png'),'Resolution',300, 'ContentType', 'image')
 %     close gcf
 % end

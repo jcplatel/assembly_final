@@ -17,12 +17,11 @@ end
 %IDX0=zeros(N,Ne);
 NCl=NClini;
 %cM = parallel.pool.Constant(M);
-stream = RandStream('mlfg6331_64');  % Random number stream
-options = statset('UseParallel',1,'UseSubstreams',1,...
-    'Streams',stream);
 
-% [IDX,~,sumd]  = kmeans(M,NCl,'Options',options,"MaxIter",1000,'OnlinePhase','on','Replicates',N); % Kmeans on distance of covariance metric
-[IDX,~,sumd] = kmeans(M,NCl,'Options',options,"MaxIter",1000,'Replicates',N); % Kmeans on distance of covariance metric
+options = statset('UseParallel',1);
+
+[IDX,~,sumd]  = kmeans(M,NCl,'Options',options,"MaxIter",1000,'OnlinePhase','on','Replicates',N); % Kmeans on distance of covariance metric
+% [IDX,~,sumd] = kmeans(M,NCl,'Options',options,"MaxIter",1000,'Replicates',N); % Kmeans on distance of covariance metric
 %%%%
 % nb_rep = 1000;
 % inerties_totales = zeros(nb_rep, 1);

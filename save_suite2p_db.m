@@ -1,0 +1,55 @@
+%%read Fall.mat and write it in the original data folder
+
+% ask user to select an .nwb file (dialog showing only .nwb) and get its folder
+% Demander à l'utilisateur de sélectionner un fichier .nwb, avec chemin par défaut
+defaultFolder = "E:\Data\Aurelie\data\nocues\446178\"; % chemin par défaut
+[file, folder] = uigetfile('*.nwb', 'Sélectionnez un fichier .nwb', fullfile(defaultFolder, '*.nwb'));
+if isequal(file, 0) || isequal(folder, 0)
+    error('Aucun fichier sélectionné.');
+end
+
+selected_fullpath = fullfile(folder, file);
+dataset_path_folder = fileparts(selected_fullpath);
+dataset_path = [dataset_path_folder filesep];
+filename = selected_fullpath;
+
+
+dataset_file = fullfile(folder,"data_recording.mat");
+
+% maintenant demander à l'utilisateur de choisir le dossier contenant Fall.mat
+% en utilisant comme chemin par défaut le dossier obtenu ci-dessus
+% fall_folder = uigetdir(folder, 'Sélectionnez le dossier contenant Fall.mat (ou annulez)');
+fall_folder = folder;
+% construire le chemin complet vers Fall.mat en supposant le nom et sous-dossiers possibles
+% si Fall.mat est directement dans le dossier sélectionné :
+Fall_path_candidate = fullfile(fall_folder, "Fall.mat");
+if exist(Fall_path_candidate, 'file')
+    Fall_path = Fall_path_candidate;
+else
+    % sinon, tenter de trouver Fall.mat récursivement dans le dossier sélectionné
+    d = dir(fullfile(fall_folder, '**', 'Fall.mat'));
+    if ~isempty(d)
+        Fall_path = fullfile(d(1).folder, d(1).name);
+    else
+        error('Fall.mat introuvable dans le dossier sélectionné.');
+    end
+end
+
+openingnwb
+load (Fall_path);
+F=double(F(iscell(:,1)>0,:));
+
+data_recording = struct();
+
+liste_vars_results = {'identifier', 'F', 'sampling_rate', 'speed', 'position', 'path'};
+data_recording.identifier=identifier;
+data_recording.F=F;
+data_recording.sampling_rate=sampling_rate;
+data_recording.speed=speed;
+data_recording.position=position;
+data_recording.path=folder;
+
+chemin_save_local = fullfile(folder, 'data_recording.mat');
+
+% Sauvegarde de la structure data_recording dans le dossier cible
+save(chemin_save_local, 'data_recording');

@@ -12,7 +12,8 @@ function [Race,SumAct,MAct,NRace,RasterRace,TRace, Raster,max_cells_allowed,opts
     NShfl = 100;                % Nombre de shuffles pour le seuil
     % 
     [NCell, Nz] = size(Raster);
-    max_cells_SCE = floor(NCell*30/100);
+    % max_cells_SCE = floor(NCell*30/100);
+    max_cells_SCE = 150;
     opts.max_cells_SCE = max_cells_SCE ;
 
     % Optionnel: Sécurité absolue, forcer les bad frames à 0 dans le Raster dès le début
@@ -25,7 +26,8 @@ function [Race,SumAct,MAct,NRace,RasterRace,TRace, Raster,max_cells_allowed,opts
     % =====================================================================
     SumAct = sum(Raster, 1); % Activité instantanée (0 frame de décalage)
     
-    max_cells_allowed = max(round(NCell * 0.20), max_cells_SCE); 
+    % max_cells_allowed = max(round(NCell * 0.50), max_cells_SCE); 
+    max_cells_allowed = max_cells_SCE
     toxic_frames = SumAct > max_cells_allowed;
     
     if any(toxic_frames)
@@ -48,10 +50,10 @@ function [Race,SumAct,MAct,NRace,RasterRace,TRace, Raster,max_cells_allowed,opts
         MAct(i) = sum(max(Raster(:, i:i+synchronous_frames), [], 2));
     end
     
-    % % =====================================================================
-    % % 3. SHUFFLING (Local Jittering) ET CALCUL DU SEUIL STATISTIQUE
-    % % =====================================================================
-    % 
+    % =====================================================================
+    % 3. SHUFFLING (Local Jittering) ET CALCUL DU SEUIL STATISTIQUE
+    % =====================================================================
+
     Sumactsh = zeros(Nz - synchronous_frames, NShfl);   
     disp('Calcul du seuil statistique avec Local Jittering...');
 
@@ -98,18 +100,20 @@ function [Race,SumAct,MAct,NRace,RasterRace,TRace, Raster,max_cells_allowed,opts
 
     % 2. Trier les valeurs de la plus petite à la plus grande
     Valeurs_triees = sort(Valeurs_actives_shuffles);
-    
+
     % 3. Appliquer une moyenne glissante (ex: fenêtre de 3)
     Valeurs_lissees = movmean(Valeurs_triees, 3);
-    
+
     % 4. Prendre le percentile sur cette distribution adoucie
     % (Vous pouvez tester 99 ou 95)
     sce_n_cells_threshold = ceil(prctile(Valeurs_lissees, 90));
-    
+
     % 5. Garde-fou
     min_cells_absolute = 5;
+    max_cells_absolute = 10;
     sce_n_cells_threshold = max(sce_n_cells_threshold, min_cells_absolute);
-    
+    sce_n_cells_threshold = min(sce_n_cells_threshold, max_cells_absolute);
+
     % fprintf('--> Seuil retenu (Lissage + Percentile) : %d cellules\n', sce_n_cells_threshold);
 
 

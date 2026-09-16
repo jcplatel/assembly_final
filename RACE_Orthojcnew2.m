@@ -8,12 +8,8 @@
 [NCell, NRace] = size(Race);
 NCl_input = NClOK;        % Nombre de clusters suggéré par K-means initial
 NShuf = 5000;             % Nombre de permutations
-P_VAL_THRESHOLD = 0.05;   % Seuil relaxé (pas de correction Bonferroni ici)
+P_VAL_THRESHOLD = 0.05/NClOK;   % correction Bonferroni
 MIN_CELL_SIZE = 5;        % Nombre min de cellules pour former une assemblée
-
-% fprintf('--- DÉBUT RACEORTHOJC_NEW ---\n');
-% fprintf('Paramètres : %d Shuffles, P-val < %.2f, Taille Min > %d\n', ...
-%     NShuf, P_VAL_THRESHOLD, MIN_CELL_SIZE);
 
 %% Étape 1 : Calcul de l'association Cellule-Cluster (Permutations)
 
@@ -106,6 +102,7 @@ end
 %% Étape 3 : Test d'Activation des Assemblées (RACE Events)
 
 % 3.1 Somme observée des spikes par assemblée et par event RACE
+P_VAL_THRESHOLD = 0.05 / NCl_cand;  
 RCl = zeros(NCl_cand, NRace);
 for i = 1:NCl_cand
     RCl(i, :) = sum(Race(assembly_candidates{i}, :));
@@ -163,10 +160,6 @@ NCl           = sum(keepAsm);                 % NB FINAL
 %     fprintf('Aucune assemblée active trouvée après test RACE. Fin.\n');
 %     return;
 % end
-
-% 4.2 Tri pour Raster Plot (Logique binaire)
-% Note : Si NCl > 52, la précision double est atteinte, le tri peut être approximatif.
-% Mais pour NCl < 50, c'est parfait.
 
 % Tri des événements (Colonnes - RACEs)
 Cl0 = find(sum(PCl_final, 1) == 0); % Bruit / Pas d'assemblée

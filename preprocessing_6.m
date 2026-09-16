@@ -1,4 +1,6 @@
-function [Tr1b,speedsm,Raster,SumAct,MAct,Race,RasterRace,WinRest, WinActive,TRace,Fzero,DFF0,th_detection,bad_frames,max_cells_allowed,n_transients_total,opts] = preprocessing_6(F,opts,speed,path,sampling_rate,namefull)
+function [Tr1b,speedsm,Raster,SumAct,MAct,Race,RasterRace,WinRest, WinActive,TRace,Fzero,DFF0,th_detection,...
+    bad_frames,max_cells_allowed,n_transients_total,Acttmp2,PromALL,WidthALL,opts] = ...
+    preprocessing_6(F,opts,speed,path,sampling_rate,namefull)
 
 %% Load settings
 MinPeakDistancesce = opts.MinPeakDistancesce;      % 5 default
@@ -52,8 +54,7 @@ if length(isActive_expanded)>Nz
     isActive_expanded=isActive_expanded(1:Nz);
 end
 WinActive = find(isActive_expanded);
-WinRest = find(~isActive_expanded);
-
+WinRest = find(~isActive_expanded & speedsm > -0.1);%we don't want too negative value to be included
 %% Rest period has to be 3sec
 WinRest_bin = false(1, Nz);
 WinRest_bin(WinRest) = true;
@@ -65,7 +66,7 @@ WinRest = find(WinRest_bin);
 
 % Raster = transient_detection_mad (Tr1b,MinPeakDistancesce,MinPeakDistance,threshold_peak,WinRest,WinActive);
 % [Raster,th] = transient_detection_std (Tr1b,MinPeakDistancesce,MinPeakDistance,threshold_peak,WinRest,WinActive);
-[Raster,Acttmp2,th_detection] = transient_detection_shot_theta (Tr1b,MinPeakDistancesce,MinPeakDistance,threshold_peak,WinRest,WinActive,DFF0,namefull,Fzero);
+[Raster, Acttmp2, th_detection, BurstMask, PromALL,WidthALL] = transient_detection_shot_theta (Tr1b,MinPeakDistance,threshold_peak,WinRest,DFF0,namefull,Fzero);
 
 %% 
 % ÉLIMINER LES CELLULES HYPERACTIVES 
@@ -84,5 +85,5 @@ cellules_hyperactives_idx = find(transients_percell > max_peak);
 
 % ===== DÉTECTION DES SCE (Synchronous Events) =====
 
-[Race,SumAct,MAct,NRace,RasterRace,TRace, Raster,max_cells_allowed, opts] = SCE_detection3 (Raster,opts,bad_frames);
+[Race,SumAct,MAct,NRace,RasterRace,TRace, Raster,max_cells_allowed, opts] = SCE_detection4 (Raster,opts,bad_frames);
 

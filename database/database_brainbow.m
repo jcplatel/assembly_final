@@ -141,19 +141,27 @@ end
 function lancer_scan(dossier_source, condition, version_s2p, commentaire, forcer_mise_a_jour, txt_log)
     global path_save;
     
-    liste_vars_extraction = {'identifier', 'F', 'iscell', 'sampling_rate', 'speed', 'position', 'path'};
-    
     if ~isfolder(dossier_source)
         uialert(gcbf, 'Le dossier source spécifié n''existe pas.', 'Erreur de dossier');
         return;
     end
     
-    log_msg(txt_log, sprintf('Recherche des fichiers results.mat dans %s...', dossier_source));
-    tous_les_fichiers = dir(fullfile(dossier_source, '**', 'k6', 'results.mat'));
-    log_msg(txt_log, sprintf('%d fichiers trouvés.', length(tous_les_fichiers)));
+    log_msg(txt_log, sprintf('Recherche globale dans %s...', dossier_source));
+    
+    % Recherche récursive des deux types de fichiers
+    liste_rec = dir(fullfile(dossier_source, '**', 'data_recording.mat'));
+    liste_res = dir(fullfile(dossier_source, '**', 'results.mat'));
+    
+    log_msg(txt_log, sprintf('Trouvé : %d "data_recording.mat" (bruts) et %d "results.mat" (analyses).', ...
+        length(liste_rec), length(liste_res)));
+    
+    if isempty(liste_rec) && isempty(liste_res)
+        log_msg(txt_log, '⚠️ Aucun fichier pertinent trouvé.');
+        return;
+    end
     
     if ~isfile(path_save)
-        log_msg(txt_log, sprintf('Création de la BDD : %s', path_save));
+        log_msg(txt_log, sprintf('Création de la base : %s', path_save));
         DB_Info = sprintf('Database créée le %s', datestr(now));
         save(path_save, 'DB_Info', '-v7.3');
         variables_existantes = {}; 
@@ -162,39 +170,65 @@ function lancer_scan(dossier_source, condition, version_s2p, commentaire, forcer
     end
     
     nb_ajouts = 0; nb_ignores = 0; nb_mis_a_jour = 0;
-    h_wait = waitbar(0, 'Mise à jour de la base...');
     
-    for i = 1:length(tous_les_fichiers)
-        dossier_actuel = tous_les_fichiers(i).folder;
-        chemin_results = fullfile(dossier_actuel, 'results.mat');
+    % Construire la liste de tous les éléments à traiter
+    % Structure : chemin_fichier, type ('RAW' ou 'ANALYSIS')
+    elements = struct('chemin', {}, 'type', {});
+    
+    % Priorité 1 : On intègre les manips brutes
+    for r = 1:length(liste_rec)
+        elements(end+1).chemin = fullfile(liste_rec(r).folder, liste_rec(r).name); %#ok<AGROW>
+        elements(end).type = 'RAW';
+    end
+    % Priorité 2 : On intègre/met à jour avec les analyses
+    for s = 1:length(liste_res)
+        elements(end+1).chemin = fullfile(liste_res(s).folder, liste_res(s).name); %#ok<AGROW>
+        elements(end).type = 'ANALYSIS';
+    end
+    
+    total_elements = length(elements);
+    h_wait = waitbar(0, 'Mise à jour de la base de données...');
+    
+    for i = 1:total_elements
+        elem = elements(i);
+        dossier_parent = fileparts(elem.chemin);
         
         try
-            tmp = load(chemin_results, 'identifier');
-            if isfield(tmp, 'identifier') && ~isempty(tmp.identifier)
-                nom_variable_session = matlab.lang.makeValidName(['S_' char(tmp.identifier)]);
-            else
-                nom_variable_session = sprintf('Session_Inconnue_%d', i);
-            end
-            
+            id_session = '';
+            a_ete_modifiee = false;
             est_nouvelle = false;
-            a_ete_modifiee = false; 
             
-            % Chargement ou initialisation
-            if ismember(nom_variable_session, variables_existantes)
-                Session = load(path_save, nom_variable_session).(nom_variable_session);
-                
-                % On vérifie s'il manque iscell pour décider si on force l'ouverture
-                manque_iscell = ~isfield(Session, 'iscell') || isempty(Session.iscell);
-                
-                if ~forcer_mise_a_jour && ~manque_iscell
-                    nb_ignores = nb_ignores + 1; 
-                    waitbar(i / length(tous_les_fichiers), h_wait);
-                    continue; 
+            % =============================================================
+            % CAS A : FICHIER BRUT (data_recording.mat) -> Non analysé ou brut
+            % =============================================================
+            if strcmp(elem.type, 'RAW')
+                rec_data = load(elem.chemin);
+                if isfield(rec_data, 'data_recording')
+                    struct_rec = rec_data.data_recording;
+                else
+                    struct_rec = rec_data;
                 end
                 
-                if forcer_mise_a_jour
+                if isfield(struct_rec, 'identifier') && ~isempty(struct_rec.identifier)
+                    id_session = char(struct_rec.identifier);
+                else
+                    [~, id_session] = fileparts(dossier_parent);
+                end
+                
+                nom_variable_session = matlab.lang.makeValidName(['S_' id_session]);
+                
+                % Chargement ou initialisation
+                if ismember(nom_variable_session, variables_existantes)
+                    Session = load(path_save, nom_variable_session).(nom_variable_session);
+                else
+                    Session = struct();
+                    est_nouvelle = true;
+                    a_ete_modifiee = true;
+                end
+                
+                % Remplissage métadonnées si nouvelle ou forcé
+                if est_nouvelle || forcer_mise_a_jour
                     Session.Condition = condition;
-                    Session.DossierSource = dossier_actuel;
                     Session.DateExtraction = datestr(now, 'dd/mm/yyyy HH:MM');
                     Session.Suite2P_Version = version_s2p;
                     if ~isfield(Session, 'Commentaire') || isempty(Session.Commentaire)
@@ -202,80 +236,125 @@ function lancer_scan(dossier_source, condition, version_s2p, commentaire, forcer
                     end
                     a_ete_modifiee = true;
                 end
-            else
-                % C'est une nouvelle session
-                Session = struct();
-                Session.Condition = condition;
-                Session.DossierSource = dossier_actuel;
-                Session.DateExtraction = datestr(now, 'dd/mm/yyyy HH:MM');
-                Session.Suite2P_Version = version_s2p;
-                Session.Commentaire = commentaire;
-                est_nouvelle = true;
-                a_ete_modifiee = true;
+                
+                % Variables indispensables depuis data_recording
+                Session.identifier = id_session;
+                Session.DossierSource = dossier_parent;
+                
+                champs_rec = {'F', 'sampling_rate', 'speed', 'position', 'path'};
+                for c = 1:length(champs_rec)
+                    f_name = champs_rec{c};
+                    if isfield(struct_rec, f_name) && (~isfield(Session, f_name) || isempty(Session.(f_name)) || forcer_mise_a_jour)
+                        Session.(f_name) = struct_rec.(f_name);
+                        a_ete_modifiee = true;
+                    end
+                end
+                
+                % Pour une session non analysée : on garantit des champs par défaut
+                if ~isfield(Session, 'iscell'), Session.iscell = []; a_ete_modifiee = true; end
+                if ~isfield(Session, 'K'), Session.K = NaN; a_ete_modifiee = true; end
+                
+                % Recherche Brainbow / Colorcell dans le dossier brut
+                if ~isfield(Session, 'Colorcell_Version') || isempty(Session.Colorcell_Version) || forcer_mise_a_jour
+                    Session.Colorcell_Version = trouver_meilleur_colorcell(dossier_parent);
+                    a_ete_modifiee = true;
+                end
+                
+            % =============================================================
+            % CAS B : FICHIER ANALYSE (results.mat)
+            % =============================================================
+            elseif strcmp(elem.type, 'ANALYSIS')
+                res_meta = load(elem.chemin, 'identifier', 'path', 'iscell');
+                
+                if isfield(res_meta, 'identifier') && ~isempty(res_meta.identifier)
+                    id_session = char(res_meta.identifier);
+                else
+                    [~, nom_dossier_sup] = fileparts(fileparts(elem.chemin));
+                    id_session = nom_dossier_sup;
+                end
+                
+                nom_variable_session = matlab.lang.makeValidName(['S_' id_session]);
+                
+                if ismember(nom_variable_session, variables_existantes)
+                    Session = load(path_save, nom_variable_session).(nom_variable_session);
+                else
+                    Session = struct();
+                    Session.identifier = id_session;
+                    est_nouvelle = true;
+                    a_ete_modifiee = true;
+                end
+                
+                if est_nouvelle || forcer_mise_a_jour
+                    Session.Condition = condition;
+                    Session.DateExtraction = datestr(now, 'dd/mm/yyyy HH:MM');
+                    Session.Suite2P_Version = version_s2p;
+                    if ~isfield(Session, 'Commentaire') || isempty(Session.Commentaire)
+                        Session.Commentaire = commentaire;
+                    end
+                    a_ete_modifiee = true;
+                end
+                
+                Session.DossierSource = dossier_parent; % pointe vers k6
+                
+                % Extraction K
+                k_tokens = regexp(dossier_parent, '[\\/]k(\d+)', 'tokens');
+                if ~isempty(k_tokens)
+                    Session.K = str2double(k_tokens{end}{1});
+                    a_ete_modifiee = true;
+                end
+                
+                % Extraction iscell
+                if isfield(res_meta, 'iscell')
+                    Session.iscell = res_meta.iscell;
+                    a_ete_modifiee = true;
+                end
+                
+                % Récupération du dossier brut via path si F ou d'autres signaux manquent
+                dossier_brut = '';
+                if isfield(res_meta, 'path') && ~isempty(res_meta.path)
+                    dossier_brut = char(res_meta.path);
+                    Session.path = dossier_brut;
+                elseif isfield(Session, 'path') && ~isempty(Session.path)
+                    dossier_brut = char(Session.path);
+                end
+                
+                % Compléter avec data_recording.mat si besoin
+                if ~isempty(dossier_brut) && isfile(fullfile(dossier_brut, 'data_recording.mat'))
+                    if ~isfield(Session, 'F') || isempty(Session.F) || forcer_mise_a_jour
+                        tmp_brut = load(fullfile(dossier_brut, 'data_recording.mat'));
+                        if isfield(tmp_brut, 'data_recording'), s_b = tmp_brut.data_recording; else, s_b = tmp_brut; end
+                        
+                        champs_rec = {'F', 'sampling_rate', 'speed', 'position'};
+                        for c = 1:length(champs_rec)
+                            fn = champs_rec{c};
+                            if isfield(s_b, fn), Session.(fn) = s_b.(fn); a_ete_modifiee = true; end
+                        end
+                    end
+                end
+                
+                % Recherche Colorcell (Dossier analyse puis Dossier brut)
+                if ~isfield(Session, 'Colorcell_Version') || isempty(Session.Colorcell_Version) || forcer_mise_a_jour
+                    cc_found = trouver_meilleur_colorcell(fileparts(dossier_parent));
+                    if strcmp(cc_found, 'Non trouvé') && ~isempty(dossier_brut)
+                        cc_found = trouver_meilleur_colorcell(dossier_brut);
+                    end
+                    Session.Colorcell_Version = cc_found;
+                    a_ete_modifiee = true;
+                end
             end
             
-            % -- INITIALISATION DES NOUVELLES COLONNES MANUELLES --
+            % =============================================================
+            % CHAMPS STANDARDS & ÉCRITURE BDD
+            % =============================================================
             if ~isfield(Session, 'Animal_ID'), Session.Animal_ID = ''; a_ete_modifiee = true; end
             if ~isfield(Session, 'Analysis_Assembly'), Session.Analysis_Assembly = false; a_ete_modifiee = true; end
             if ~isfield(Session, 'Analysis_Correlation'), Session.Analysis_Correlation = false; a_ete_modifiee = true; end
             if ~isfield(Session, 'Analysis_Sequence'), Session.Analysis_Sequence = false; a_ete_modifiee = true; end
             if ~isfield(Session, 'Analysis_PCs'), Session.Analysis_PCs = false; a_ete_modifiee = true; end
             
-            % -- Extraction du K --
-            k_str = regexp(strsplit(dossier_actuel, filesep), 'k(\d+)', 'tokens');
-            if ~isempty(k_str) && ~isempty(k_str{end}) && (~isfield(Session, 'K') || isnan(Session.K))
-                Session.K = str2double(k_str{end}{1}{1}); 
-                a_ete_modifiee = true;
-            elseif ~isfield(Session, 'K')
-                Session.K = NaN; 
-                a_ete_modifiee = true;
-            end
-            
-            % --- OPTIMISATION DU CHARGEMENT ---
-            % On liste UNIQUEMENT les variables qui manquent dans la base
-            vars_a_charger = {};
-            for v = 1:length(liste_vars_extraction)
-                nom_var = liste_vars_extraction{v};
-                if ~isfield(Session, nom_var) || isempty(Session.(nom_var))
-                    vars_a_charger{end+1} = nom_var;
-                end
-            end
-            
-            if forcer_mise_a_jour
-                vars_a_charger = liste_vars_extraction;
-            end
-            
-            % On ne charge depuis results.mat QUE ce qu'il nous manque (ex: juste iscell)
-            if ~isempty(vars_a_charger)
-                res = load(chemin_results, vars_a_charger{:});
-                for v = 1:length(vars_a_charger)
-                    nom_var = vars_a_charger{v};
-                    if isfield(res, nom_var)
-                        Session.(nom_var) = res.(nom_var);
-                        a_ete_modifiee = true;
-                    elseif ~isfield(Session, nom_var)
-                        Session.(nom_var) = []; 
-                        a_ete_modifiee = true;
-                    end
-                end
-            end
-            
-            % -- Recherche Colorcell --
-            if ~isfield(Session, 'Colorcell_Version') || isempty(Session.Colorcell_Version) || forcer_mise_a_jour
-                if isfield(Session, 'path') && ~isempty(Session.path) && isstring(Session.path)
-                    dossier_recherche_cc = char(Session.path);
-                else
-                    dossier_recherche_cc = dossier_actuel; 
-                end
-                Session.Colorcell_Version = trouver_meilleur_colorcell(dossier_recherche_cc);
-                a_ete_modifiee = true;
-            end
-            
-            % -- Sauvegarde --
             if a_ete_modifiee
                 eval([nom_variable_session ' = Session;']);
                 save(path_save, nom_variable_session, '-append');
-                
                 if est_nouvelle
                     variables_existantes{end+1} = nom_variable_session; 
                     nb_ajouts = nb_ajouts + 1;
@@ -286,17 +365,15 @@ function lancer_scan(dossier_source, condition, version_s2p, commentaire, forcer
                 nb_ignores = nb_ignores + 1;
             end
             
-            clear('Session', nom_variable_session, 'res', 'tmp');
-            
         catch exception
-            log_msg(txt_log, sprintf('⚠️ Erreur %d : %s', i, exception.message));
+            log_msg(txt_log, sprintf('⚠️ Erreur sur %s : %s', elem.chemin, exception.message));
         end
-        waitbar(i / length(tous_les_fichiers), h_wait);
+        waitbar(i / total_elements, h_wait);
     end
     
     close(h_wait);
-    log_msg(txt_log, sprintf('✅ TERMINÉ ! Ajouts: %d | MAJ: %d | Ignorés: %d', nb_ajouts, nb_mis_a_jour, nb_ignores));
-    uialert(gcbf, 'Scan terminé avec succès ! Allez dans l''onglet Éditeur et cliquez sur "Recharger".', 'Succès');
+    log_msg(txt_log, sprintf('✅ Scan terminé : %d ajouts | %d MAJ | %d ignorés.', nb_ajouts, nb_mis_a_jour, nb_ignores));
+    uialert(gcbf, 'Scan terminé avec succès ! Cliquez sur "Recharger" dans l''onglet Éditeur.', 'Succès');
 end
 
 function nom_fichier_trouve = trouver_meilleur_colorcell(dossier_cible)

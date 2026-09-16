@@ -6,7 +6,7 @@ function sCl = kmeansoptrndnew(E,N,NCl)   %Race,10,NCl
 ERnd = zeros(Np,Ne);
 
 for i = 1:Ne
-    ERnd(:,i) = E(randperm(Np),i);    %random perm of sce for each cell
+    ERnd(:,i) = E(randperm(Np),i);   
 end
 
 % %% Covariance matrix
@@ -21,9 +21,7 @@ M_shuff = CovarMjc(ERnd);
 
 
 %% k-means
-stream = RandStream('mlfg6331_64');  % Random number stream
-options = statset('UseParallel',1,'UseSubstreams',1,...
-    'Streams',stream);
+options = statset('UseParallel',1);
 
 
 %IDX = kmeans(M,NCl); %modified on 2023-10-22

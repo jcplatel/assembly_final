@@ -1,7 +1,17 @@
 function [Tr1b,bad_frames] = motion_correction_substraction (Tr1b,path,speed) 
 
-load(strcat(path, 'Fall.mat'), 'ops');
+bad_frames = [];
 
+fallPath = strcat(path, 'Fall.mat');
+if ~isfile(fallPath)
+    return;
+end
+
+load(fallPath, 'ops');
+
+if ~isfield(ops, 'corrXY')
+    return;
+end
 corrXY = ops.corrXY;
 
 % Approche robuste : Déviation par rapport à la tendance locale
