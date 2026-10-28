@@ -60,7 +60,7 @@ temps_global = tic;
 
 files_to_process =1:numel (matfile) ;%22;%  [1:3,23:30];%1:numel (matfile) 
 
-for file_num = files_to_process
+for file_num = 44:48%files_to_process
     temps_fichier = tic; 
     % try
     close all
@@ -150,7 +150,7 @@ for file_num = files_to_process
     savefig=1;
     raster_rastermap
 
-    for nanalysis=4:24 %4:20%[12 ,15, 17, 18]%:5
+    for nanalysis=5:20 %4:20%[12 ,15, 17, 18]%:5
 
         NClini=nanalysis;
         namefull = strcat (namefullold,'k',num2str(nanalysis),'\'); 

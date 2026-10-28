@@ -13,22 +13,22 @@
 clear; clc; close all;
 
 %% 1. PARAMETRES ET CHEMINS
-dossier_mere = 'E:\';
-nb_top       = 5;      % nb de meilleurs K à sortir par session
-k_start      = 4;
+dossier_mere = 'E:\Data\Aurelie\analysis\Final\assembly\nocues\';
+nb_top       = 1;      % nb de meilleurs K à sortir par session
+k_start      = 9;
 
 %% 2. POIDS DES CRITERES POUR LE SCORE GLOBAL
-weight_silhouette       = 0;     % volontairement à 0 : la silhouette diminue quasi
+weight_silhouette       = 0.33;     % volontairement à 0 : la silhouette diminue quasi
                                   % monotonement avec K sur ce dataset, elle biaiserait
                                   % systématiquement vers les K faibles
-weight_recall           = 0.30;  % proportion de SCE clusterisés (SCEok / SCE)
-weight_cell_specificity = 0.20;  % proportion des activations d'une cellule qui tombent
+weight_recall           = 0.33;  % proportion de SCE clusterisés (SCEok / SCE)
+weight_cell_specificity = 0.167;  % proportion des activations d'une cellule qui tombent
                                   % dans les SCE de son propre cluster, parmi tous les
                                   % SCE valides
-weight_sce_purity       = 0.15;  % proportion d'un SCE donné composée des cellules du
+weight_sce_purity       = 0.167;  % proportion d'un SCE donné composée des cellules du
                                   % cluster censé l'expliquer, parmi toutes les cellules
                                   % du raster
-weight_size             = 0.35;  % NOUVEAU : score de taille d'assemblée (voir sizeScore)
+weight_size             = 0;  % NOUVEAU : score de taille d'assemblée (voir sizeScore)
 
 % --- Cible de taille d'assemblée, en % du réseau total (Ncell) ---
 % Fenêtre "idéale" 10-15% (cohérent avec Malvache et al.), avec décroissance
@@ -45,16 +45,16 @@ if isempty(tous_les_fichiers)
     error('Aucun fichier results.mat trouvé.');
 end
 
-sessions_autorisees = {'411582_230320_plane0','411582_230320_plane1','443669_220614_plane0','443669_220614_plane1', ...
-    '443695_220728_plane0','443695_220809_plane1','444113_220927_plane1','444113_220928_plane1', ...
-    '444119_220919_plane0','444119_220919_plane1','444152_221129_plane0','444152_221129_plane1', ...
-    '444175_221121_plane0','444175_221121_plane1','444175_221125_plane0','444175_221125_plane1', ...
-    '4461781_1062025_plane0','4461781_1062025_plane1','4461981_2062025_plane0','4461781_4062025_plane0', ...
-    '4461781_4062025_plane1'};
-
-% Filtrage vectoriel direct et réécriture de la variable tous_les_fichiers
-tous_les_fichiers = tous_les_fichiers(contains({tous_les_fichiers.folder}, sessions_autorisees));
-fprintf('%d fichiers trouvés. Analyse en cours...\n', length(tous_les_fichiers));
+% sessions_autorisees = {'411582_230320_plane0','411582_230320_plane1','443669_220614_plane0','443669_220614_plane1', ...
+%     '443695_220728_plane0','443695_220809_plane1','444113_220927_plane1','444113_220928_plane1', ...
+%     '444119_220919_plane0','444119_220919_plane1','444152_221129_plane0','444152_221129_plane1', ...
+%     '444175_221121_plane0','444175_221121_plane1','444175_221125_plane0','444175_221125_plane1', ...
+%     '4461781_1062025_plane0','4461781_1062025_plane1','4461981_2062025_plane0','4461781_4062025_plane0', ...
+%     '4461781_4062025_plane1'};
+% 
+% % Filtrage vectoriel direct et réécriture de la variable tous_les_fichiers
+% tous_les_fichiers = tous_les_fichiers(contains({tous_les_fichiers.folder}, sessions_autorisees));
+% fprintf('%d fichiers trouvés. Analyse en cours...\n', length(tous_les_fichiers));
 
 %% 4. EXTRACTION ET CALCULS DES METRIQUES (PARALLELISE)
 fprintf('Démarrage du pool parallèle...\n');
@@ -98,14 +98,14 @@ parfor i = 1:Nfichiers
 
     % --- Chargement des données results.mat ---
     try
-        data = load(matFilePath, 'RasterRace', 'NRace', 'NRaceOK', 'meansClOK', 'assemblyortho');
+        data = load(matFilePath, 'RasterRace', 'NRace', 'NRaceOK', 'mean_sClOK', 'assemblyortho');
     catch
         send(D,i); continue;
     end
 
     % 1. Silhouette
-    if isfield(data,'meansClOK') && isnumeric(data.meansClOK) && ~isnan(data.meansClOK)
-        c_silhouette = data.meansClOK;
+    if isfield(data,'mean_sClOK') && isnumeric(data.mean_sClOK) && ~isnan(data.mean_sClOK)
+        c_silhouette = data.mean_sClOK;%meansClOK
     else
         send(D,i); continue;
     end
@@ -334,6 +334,56 @@ dataOut = [Excel_Session, Excel_Rang, Excel_K, Excel_Score, Excel_Silh, Excel_Re
 
 writecell([header_global; dataOut], path_global, 'Range', 'A1');
 fprintf('%d lignes (top %d par session) écrites dans %s\n', size(dataOut,1), nb_top, path_global);
+
+%% 7b. SAUVEGARDE .MAT : chemin du results.mat du meilleur K par session (NOUVEAU)
+% Une ligne par session : le rang 1 uniquement, même si nb_top > 1.
+% Les sessions avec moins de 2 valeurs de K sont absentes (cf. section 6).
+% La règle de choix du K (poids, cible de taille) est sauvegardée avec :
+% elle documente que le K a été choisi sans regarder les couleurs.
+if isempty(Excel_Rang)
+    warning('Aucune session classée : best_k_par_session.mat non créé.');
+else
+    estPremier = cell2mat(Excel_Rang) == 1;
+
+    best_k = table();
+    best_k.session         = Excel_Session(estPremier);
+    best_k.K               = cell2mat(Excel_K(estPremier));
+    best_k.score           = cell2mat(Excel_Score(estPremier));
+    best_k.pct_reseau      = cell2mat(Excel_PctNetwork(estPremier));
+    best_k.dossier         = Excel_Path(estPremier);
+    best_k.chemin_results  = fullfile(best_k.dossier, 'results.mat');
+    best_k.chemin_brainbow = fullfile(best_k.dossier, 'brainbow.mat');
+    best_k.existe          = isfile(best_k.chemin_results);
+
+    % Identifiants tirés du nom de session (ex. '444119_220919_plane0'),
+    % à passer à stats_clonales_champ.m (id_animal, id_session, id_champ)
+    morceaux = cellfun(@(s) strsplit(s, '_'), best_k.session, 'UniformOutput', false);
+    best_k.animal = cellfun(@(m) m{1},                morceaux, 'UniformOutput', false);
+    best_k.date   = cellfun(@(m) m{min(2, numel(m))}, morceaux, 'UniformOutput', false);
+    best_k.plan   = cellfun(@(m) m{end},              morceaux, 'UniformOutput', false);
+
+    liste_chemins = best_k.chemin_results;   % la simple liste des chemins
+
+    regle_choix_K = struct( ...
+        'weight_silhouette',       weight_silhouette, ...
+        'weight_recall',           weight_recall, ...
+        'weight_cell_specificity', weight_cell_specificity, ...
+        'weight_sce_purity',       weight_sce_purity, ...
+        'weight_size',             weight_size, ...
+        'size_pct_target_min',     size_pct_target_min, ...
+        'size_pct_target_max',     size_pct_target_max, ...
+        'size_pct_floor',          size_pct_floor, ...
+        'size_pct_ceiling',        size_pct_ceiling, ...
+        'k_start',                 k_start);
+
+    path_mat = fullfile(dossier_mere, 'best_k_par_session.mat');
+    save(path_mat, 'best_k', 'liste_chemins', 'regle_choix_K');
+    fprintf('%d sessions écrites dans %s\n', height(best_k), path_mat);
+    if any(~best_k.existe)
+        warning('%d chemin(s) results.mat introuvable(s) : voir best_k.existe.', ...
+            sum(~best_k.existe));
+    end
+end
 
 %% 8. GRAPHIQUES : Taille d'assemblée / Score Global vs K
 figure('Name','Analyse des métriques par K','Color','w','Position',[100 100 1300 650]);

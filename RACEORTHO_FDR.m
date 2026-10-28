@@ -12,7 +12,7 @@
 [NCell, NRace] = size(Race);
 NCl_input = NClOK;        % Nombre de clusters suggéré par K-means initial
 NShuf = 5000;              % Nombre de permutations
-FDR_Q = 0.05;               % Taux de fausses découvertes toléré (Benjamini-Hochberg)
+FDR_Q = 0.10;               % Taux de fausses découvertes toléré (Benjamini-Hochberg)
 MIN_CELL_SIZE = 5;         % Nombre min de cellules pour former une assemblée
 
 % fprintf('--- DEBUT RACEORTHOJC_FDR ---\n');

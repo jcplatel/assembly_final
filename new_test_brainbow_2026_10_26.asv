@@ -1,0 +1,92 @@
+%% =========================================================================
+%  LANCER stats_clonales_champ SUR LE MEILLEUR K DE CHAQUE SESSION
+%  -------------------------------------------------------------------------
+%  Enchaînement complet :
+%    1. analyse_assembly_results5parfor_taille.m
+%         -> best_k_par_session.mat (meilleur K de chaque session)
+%    2. CE SCRIPT
+%         -> un stats_clonales.mat (+ figures) dans le dossier du meilleur K
+%            de chaque session
+%    3. agregation_stats_clonales.m
+%         -> résultats sur tous les champs et tous les animaux
+%  =========================================================================
+
+clear
+
+dossier_analyse = 'E:\Data\Aurelie\analysis\Final\assembly\nocues\';
+load(fullfile(dossier_analyse, 'best_k_par_session.mat'), 'best_k');
+echecs = cell(0, 2);   % sessions qui ont échoué, et pourquoi
+
+for i_sess = 1:height(best_k)
+    nom = best_k.session{i_sess};
+    if ~best_k.existe(i_sess)
+        fprintf('Session %s ignorée : results.mat introuvable.\n', nom);
+        continue
+    end
+    fprintf('\n##### Session %d/%d : %s (K = %d) #####\n', ...
+        i_sess, height(best_k), nom, best_k.K(i_sess));
+
+    % --- 1. Effacer les données de la session précédente -----------------
+    % Indispensable : si une variable manque dans un results.mat, load se
+    % contente d'un avertissement et la valeur de la session d'avant
+    % serait réutilisée sans erreur.
+    clear colorcell nbassemblies assembly namefull calcium outline_gcampx ...
+          outline_gcampy score_sequence res Race RasterRace PCl_final id_K
+
+    % --- 2. Charger les données de la session (meilleur K) ---------------
+    % ATTENTION : liste_chemins / chemin_results est un cell array ->
+    % accolades { } pour obtenir le texte du chemin.
+    % Race, RasterRace et PCl_final servent seulement aux descripteurs SCE ;
+    % si l'un manque dans results.mat, load affiche un simple avertissement.
+    load(best_k.chemin_results{i_sess}, 'colorcell', 'nbassemblies', 'assembly', ...
+        'namefull', 'calcium', 'outline_gcampx', 'outline_gcampy', ...
+        'Race', 'RasterRace', 'PCl_final');
+    id_K = best_k.K(i_sess);
+
+    % --- 3. Identifiants pour l'agrégation --------------------------------
+    % ex. 'P2M_444119_220919_plane0_26_09_...' -> '444119', '220919', 'plane0'
+    tok = regexp(nom, '(\d+)_(\d+)_(plane\d+)', 'tokens', 'once');
+    if isempty(tok)
+        warning('Nom de session non reconnu, session ignorée : %s', nom);
+        continue
+    end
+    id_animal  = tok{1};
+    id_session = tok{2};
+    id_champ   = tok{3};
+    % Par défaut, le même plan d'un même animal à deux dates est considéré
+    % comme le même champ (choix prudent). Si ce n'est pas le même champ de
+    % vue : id_champ = [tok{3} '_' tok{2}];
+
+    % Condition déduite du chemin (à adapter aux noms de vos dossiers)
+    if contains(best_k.dossier{i_sess}, 'nocues')
+        id_condition = 'sans_indice';
+    elseif contains(best_k.dossier{i_sess}, 'cues')
+        id_condition = 'avec_indice';
+    else
+        id_condition = 'non_precisee';
+    end
+
+    % --- 4. Dossier de sortie : celui du meilleur K ----------------------
+    % Remplace le namefull lu dans results.mat, pour que stats_clonales.mat
+    % soit à coup sûr dans le dossier que l'agrégation va lire.
+    namefull = [best_k.dossier{i_sess} filesep];
+
+    % --- 5. Analyse ------------------------------------------------------
+    % En cas d'erreur, on note la session et on passe à la suivante.
+    try
+        stats_clonales_champ2
+    catch err_sess
+        fprintf(2, 'ÉCHEC %s : %s\n', nom, err_sess.message);
+        echecs(end+1, :) = {nom, err_sess.message}; %#ok<SAGROW>
+    end
+end
+
+if isempty(echecs)
+    fprintf('\nToutes les sessions ont été analysées.\n');
+else
+    fprintf(2, '\n%d session(s) en échec, à corriger avant l''agrégation :\n', size(echecs, 1));
+    disp(cell2table(echecs, 'VariableNames', {'session', 'erreur'}))
+end
+fprintf('Lancer ensuite agregation_stats_clonales.m\n');
+
+agregation_stats_clonales2
