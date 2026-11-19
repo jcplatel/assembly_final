@@ -21,7 +21,7 @@ end
 fs = R.sampling_rate;
 t = (-R.opts.psth_avant:R.opts.psth_apres) / fs;
 tl = tiledlayout(fig, 1, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
-title(tl, sprintf('%s: %d runs, %d/%d cells in the sequence', R.nom, R.n_courses, R.n_sequence, R.NCell), ...
+title(tl, sprintf('%s: %d runs, %.0f/%d cells in the sequence', R.nom, R.n_courses, R.n_sequence, R.NCell), ...
     'Interpreter', 'none', 'FontWeight', 'bold', 'FontSize', 11);
 ordre = R.ordre_app;
 panneaux = {R.psth_app, R.n_psth_app, 'A. Half of the runs (sorting)'; ...
@@ -56,8 +56,15 @@ set(ax, 'XLim', lim, 'YLim', lim, 'TickDir', 'out', 'FontSize', 9);
 axis(ax, 'square');
 xlabel(ax, 'delay after run onset, first half (s)');
 ylabel(ax, 'delay after run onset, other half (s)');
-title(ax, {'C. Same order on the other half?', sprintf('rho = %.2f, %s', R.rho, texte_p(R.p_rho))}, ...
-    'FontSize', 10);
+if isfield(R, 'kfold')
+    % 19 nov. : the scatter is one 50/50 split; the session result is the cross-validation
+    title(ax, {'C. Same order on the other half? (one split)', ...
+        sprintf('this split: rho = %.2f, %s', R.rho_moitie, texte_p(R.p_rho_moitie)), ...
+        sprintf('%s: mean rho = %.2f, %s', R.validation, R.rho, texte_p(R.p_rho))}, 'FontSize', 10);
+else
+    title(ax, {'C. Same order on the other half?', sprintf('rho = %.2f, %s', R.rho, texte_p(R.p_rho))}, ...
+        'FontSize', 10);
+end
 box(ax, 'off');
 exportgraphics(fig, fullfile(dossier, 'sequence_session.png'), 'Resolution', 150);
 end

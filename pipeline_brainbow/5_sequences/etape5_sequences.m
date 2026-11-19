@@ -23,6 +23,11 @@ function statut = etape5_sequences(session, config)
 %  Couleurs (6 nov., test de l'utilisateur) : sur l'ordre de toutes les
 %  courses, distance dans la séquence des paires de même couleur contre
 %  couleurs différentes (distance_sequence_couleur).
+%  19 nov. : opts.validation = 'kfold' (validation_kfold) : rho et p_rho
+%  viennent de 100 coupures (5-fold x 20 ; 50/50 x 50 sous 10 courses), p
+%  par permutation ; test de couleur sur les cellules validées (>= 50 % des
+%  coupures), rangées par leur décalage moyen sur les courses de test.
+%  La coupure 50/50 unique reste pour la figure (rho_moitie, p_rho_moitie).
 %  Écrit <session>\sequences\sequences.mat et sequence_session.png.
 %  =========================================================================
 
@@ -118,6 +123,22 @@ if sum(seq) >= 5
         'Tail', 'right');
 end
 
+% 19 nov. (demandé par l'utilisateur) : validation croisée répétée. La
+% coupure 50/50 ci-dessus reste pour la figure de la session (rho_moitie).
+R.validation = 'moitie (1 coupure 50/50)';
+R.rho_moitie = R.rho; R.p_rho_moitie = R.p_rho;
+ordre_couleur = R.ordre_tout;
+if strcmp(opts.validation, 'kfold')
+    V = validation_kfold(DF, debuts, fins, opts, session.graine);
+    R.kfold = V;
+    R.validation = V.validation;
+    R.rho = V.rho; R.p_rho = V.p_rho;
+    R.n_sequence = V.n_sequence;            % moyenne sur les coupures (courses d'apprentissage)
+    R.n_deux = V.n_deux; R.n_deux_hasard = V.n_deux_hasard;
+    R.n_validees = V.n_validees;
+    ordre_couleur = V.ordre_valide;         % test de couleur : cellules validées, ordre sur les courses de test
+end
+
 %% 5. Activité moyenne autour du début de course (figure)
 psth = @(courses) moyenne_autour(DF, debuts(courses), opts.psth_avant, opts.psth_apres);
 [R.psth_app, R.n_psth_app] = psth(courses_app);
@@ -134,16 +155,20 @@ verifier_alignement(NCell, colorcell, outline_gcampx, session.nom);
 um = session.um_par_px;
 if isnan(um), um = config.um_par_px_defaut; end
 R.colorcell = colorcell(:);
-Cc = distance_sequence_couleur(R.ordre_tout, colorcell(:), gcamp_centroid * um, opts.nPerm_couleur, ...
+R.ordre_couleur = ordre_couleur;
+Cc = distance_sequence_couleur(ordre_couleur, colorcell(:), gcamp_centroid * um, opts.nPerm_couleur, ...
     opts.min_paires_meme, session.graine);
 noms_c = fieldnames(Cc);
 for k = 1:numel(noms_c)
     R.(['coul_' noms_c{k}]) = Cc.(noms_c{k});
 end
 
-statut = sprintf(['%d courses, %d/%d cellules dans la séquence (%.0f %%), ordre sur l''autre moitié des ' ...
-    'courses : rho = %.2f, p = %.3g ; même couleur : %+.1f %% de distance dans la séquence, p = %.3g'], ...
-    n_courses, R.n_sequence, NCell, 100 * R.n_sequence / NCell, R.rho, R.p_rho, Cc.pct, Cc.p);
+statut = sprintf(['%d courses, %.0f/%d cellules dans la séquence (%.0f %%), ordre sur les courses de test ' ...
+    '(%s) : rho = %.2f, p = %.3g ; même couleur : %+.1f %% de distance dans la séquence, p = %.3g'], ...
+    n_courses, R.n_sequence, NCell, 100 * R.n_sequence / NCell, R.validation, R.rho, R.p_rho, Cc.pct, Cc.p);
+if isfield(R, 'n_validees')
+    statut = sprintf('%s ; %d cellules validées', statut, R.n_validees);
+end
 R.statut = statut;
 save(fichier, '-struct', 'R');
 

@@ -6,6 +6,22 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.19c (19 nov.)
+- Étape 5 (séquences), choix de l'utilisateur : validation croisée répétée
+  (`config.seq.validation = 'kfold'`, avant `'moitie'`, ancienne valeur en
+  commentaire dans `config_brainbow.m`). 5-fold x 20 = 100 coupures 80 / 20 ;
+  sessions de moins de 10 courses : 50 / 50 x 50. rho d'une session =
+  moyenne des 100 coupures ; p par permutation (décalages de test mélangés
+  entre les cellules, 1000 fois). Nouvelle fonction
+  `5_sequences/validation_kfold`.
+- Test de couleur dans la séquence : seulement les cellules validées
+  (retenues sur l'apprentissage ET retrouvées dans le test dans >= 50 % des
+  coupures), rangées par leur décalage moyen sur les courses de test (avant :
+  toutes les cellules de la séquence sur toutes les courses).
+- La coupure 50/50 unique reste pour la figure de chaque session
+  (`rho_moitie`) ; le panneau C affiche aussi le résultat de la validation.
+- Étape 5 à relancer (cues et nocues). Étapes 1 à 4 inchangées.
+
 ## 2026.11.19b (19 nov.)
 - Interface : menu de condition à côté de « Overall setting » (*no cues* /
   *cues*). Il choisit les sessions de la table (`sans_indice` ou

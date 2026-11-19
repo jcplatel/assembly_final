@@ -17,22 +17,25 @@ function T = agregation_sequences(sessions, config)
 dossier = fullfile(config.PathSave, 'sequences_agregation');
 if ~isfolder(dossier), mkdir(dossier); end
 statuts = {};
-lignes = cell(0, 21);
+validations = {};
+lignes = cell(0, 22);
 champs_c = {'coul_n_colorees', 'coul_n_meme', 'coul_n_diff', 'coul_d_meme', 'coul_d_diff', 'coul_delta', ...
     'coul_pct', 'coul_p', 'coul_rho_espace'};
 for s = 1:height(sessions)
     f = fullfile(sessions.dossier{s}, 'sequences', 'sequences.mat');
     if ~isfile(f), continue; end
     vars = intersect([{'NCell', 'n_courses', 'duree_course_s', 'n_sequence', 'n_sequence_tout', 'n_deux', ...
-        'n_deux_hasard', 'rho', 'p_rho', 'statut'}, champs_c], who('-file', f));
+        'n_deux_hasard', 'rho', 'p_rho', 'statut', 'validation', 'n_validees'}, champs_c], who('-file', f));
     R = load(f, vars{:});
-    for c = [{'n_sequence', 'n_sequence_tout', 'n_deux', 'n_deux_hasard', 'rho', 'p_rho'}, champs_c]
+    for c = [{'n_sequence', 'n_sequence_tout', 'n_deux', 'n_deux_hasard', 'rho', 'p_rho', 'n_validees'}, champs_c]
         if ~isfield(R, c{1}), R.(c{1}) = NaN; end     % trop peu de courses, ou ancienne session sans couleur
     end
+    if ~isfield(R, 'validation'), R.validation = 'moitie (1 coupure 50/50)'; end
+    validations{end+1, 1} = R.validation; %#ok<AGROW>
     lignes(end+1, :) = {sessions.id_animal{s}, sessions.nom{s}, R.NCell, R.n_courses, R.duree_course_s, ...
         R.n_sequence, 100 * R.n_sequence / R.NCell, R.n_sequence_tout, R.n_deux, R.n_deux_hasard, ...
         R.rho, R.p_rho, R.coul_n_colorees, R.coul_n_meme, R.coul_n_diff, R.coul_d_meme, R.coul_d_diff, ...
-        R.coul_delta, R.coul_pct, R.coul_p, R.coul_rho_espace}; %#ok<AGROW>
+        R.coul_delta, R.coul_pct, R.coul_p, R.coul_rho_espace, R.n_validees}; %#ok<AGROW>
     statuts{size(lignes, 1), 1} = R.statut; %#ok<AGROW>
 end
 T = table();
@@ -43,7 +46,8 @@ end
 T = cell2table(lignes, 'VariableNames', {'animal', 'session', 'n_cellules', 'n_courses', 'duree_course_s', ...
     'n_sequence', 'pct_sequence', 'n_sequence_tout', 'n_retrouvees', 'n_retrouvees_hasard', 'rho', ...
     'p_rho', 'n_colorees_seq', 'n_paires_meme', 'n_paires_diff', 'dist_meme', 'dist_diff', 'delta_couleur', ...
-    'pct_couleur', 'p_couleur', 'rho_espace'});
+    'pct_couleur', 'p_couleur', 'rho_espace', 'n_validees'});
+T.validation = validations;
 T.statut = statuts;
 writetable(T, fullfile(dossier, 'sequences_sessions.csv'));
 
@@ -88,7 +92,8 @@ if ~isempty(Tc)
         if numel(re) >= 2, bc.p_espace = signrank(re, 0); end
     end
 end
-L = [resume(T, bilan, options_sequences(config)), resume_couleur(bc)];
+kfold = any(startsWith(T.validation, {'5-fold', '2-fold'}));
+L = [resume(T, bilan, options_sequences(config), kfold), resume_couleur(bc, kfold)];
 fid = fopen(fullfile(dossier, 'resume_sequences.txt'), 'w', 'n', 'UTF-8');
 if fid >= 0
     fprintf(fid, '%s\n', L{:});
@@ -112,7 +117,8 @@ end
 end
 
 
-function L = resume(T, b, opts)
+function L = resume(T, b, opts, kfold)
+if nargin < 4, kfold = false; end
 L = {};
 L{end+1} = sprintf(['SÉQUENCES PENDANT LA COURSE (étape 5, sans couleur ; méthode de sequence_2026_01_27 : ' ...
     'corrélation croisée avec les débuts de course, seuil d''Otsu, décalage < 0) :']);
@@ -124,6 +130,20 @@ L{end+1} = sprintf(['   Cellules de la séquence : %s %% des cellules en médian
     'médiane %s [%s-%s].'], nb(median(Tok.pct_sequence), '%.0f'), nb(min(Tok.pct_sequence), '%.0f'), ...
     nb(max(Tok.pct_sequence), '%.0f'), nb(median(Tok.n_courses), '%.0f'), nb(min(Tok.n_courses), '%.0f'), ...
     nb(max(Tok.n_courses), '%.0f'));
+if kfold
+    L{end+1} = sprintf(['   Validation croisée répétée : 5-fold x 20 (100 coupures 80 / 20) ; sessions de moins de ' ...
+        '%d courses : 50 / 50 x 50. rho d''une session = moyenne des 100 coupures, p par permutation.'], ...
+        opts.kfold_min_courses);
+    L{end+1} = sprintf(['   « Rangées sur les courses d''apprentissage, les cellules gardent leur ordre sur les ' ...
+        'courses de test : rho de Spearman moyen des animaux = %s ± %s (sem), %d/%d animaux > 0, Wilcoxon ' ...
+        'unilatéral sur les animaux, %s ; %d/%d sessions à p < 0,05. »'], nb(b.rho_moyen, '%.2f'), ...
+        nb(b.rho_sem, '%.2f'), b.n_pos, b.n_animaux, pv(b.p_wilcoxon), b.n_sig, b.n_sessions);
+    L{end+1} = sprintf(['   Cellules retrouvées dans la séquence des courses de test (moyenne des coupures, somme ' ...
+        'des sessions) : %.0f (%.0f attendues si les deux choix étaient indépendants) ; cellules validées ' ...
+        '(retenues et retrouvées dans >= %.0f %% des coupures) : %d.'], sum(Tok.n_retrouvees), ...
+        sum(Tok.n_retrouvees_hasard), 100 * opts.kfold_seuil_valide, sum(Tok.n_validees, 'omitnan'));
+    return
+end
 L{end+1} = sprintf(['   « Rangées sur la moitié des courses, les cellules gardent leur ordre sur l''autre ' ...
     'moitié : rho de Spearman moyen des animaux = %s ± %s (sem), %d/%d animaux > 0, Wilcoxon unilatéral sur ' ...
     'les animaux, %s ; %d/%d sessions à p < 0,05. »'], nb(b.rho_moyen, '%.2f'), nb(b.rho_sem, '%.2f'), ...
@@ -133,9 +153,15 @@ L{end+1} = sprintf(['   Cellules retrouvées dans la séquence de l''autre moiti
 end
 
 
-function L = resume_couleur(b)
+function L = resume_couleur(b, kfold)
+if nargin < 2, kfold = false; end
 L = {''};
-L{end+1} = ['MÊME COULEUR PLUS PROCHE DANS LA SÉQUENCE ? (ordre de toutes les courses ; distance = écart de ' ...
+if kfold
+    quel_ordre = 'cellules validées par la validation croisée, rangées par leur décalage moyen sur les courses de test';
+else
+    quel_ordre = 'ordre de toutes les courses';
+end
+L{end+1} = ['MÊME COULEUR PLUS PROCHE DANS LA SÉQUENCE ? (' quel_ordre ' ; distance = écart de ' ...
     'position dans la séquence, en fraction de sa longueur ; paires de cellules colorées de la séquence, sans ' ...
     'correction) :'];
 if b.n_sessions == 0

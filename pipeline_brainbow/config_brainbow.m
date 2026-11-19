@@ -264,6 +264,12 @@ config.seq.psth_apres             = 300;   % trames après (figure)
 config.seq.nPerm_couleur          = 2000;  % mélanges des couleurs (même couleur / couleurs différentes dans la séquence)
 config.seq.min_paires_meme        = 5;     % paires minimum de même couleur ET de couleurs différentes
 config.seq.min_courses            = 5;     % au moins 5 courses (choix de l'utilisateur, 6 nov.) : 3 pour ranger, 2 pour vérifier
+config.seq.validation             = 'kfold';   % (19 nov., choix de l'utilisateur ; avant : 'moitie' = une coupure 50/50)
+config.seq.kfold_k                = 5;     % 5-fold : 80 % des courses pour ranger, 20 % pour vérifier
+config.seq.kfold_repetitions      = 20;    % 5 x 20 = 100 coupures
+config.seq.kfold_min_courses      = 10;    % en dessous : 50/50 x 50 (100 coupures)
+config.seq.kfold_nPerm            = 1000;  % permutations pour la p du rho moyen de chaque session
+config.seq.kfold_seuil_valide     = 0.5;   % test de couleur : cellules retenues ET retrouvées dans >= 50 % des coupures
 
 %% ---------- Étape 4 : agrégation (= agregation_stats_clonales2) -------
 config.agreg.fdr_seuil            = 0.10;
