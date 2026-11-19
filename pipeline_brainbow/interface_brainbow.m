@@ -22,6 +22,10 @@ function interface_brainbow()
 %   "Analysis" chooses where steps 2-4 are written and read: main, or
 %   <step 1 folder>\analyses\<name> ("New..."), on the same step 1.
 %
+%   The menu next to "Overall setting" chooses the condition shown: no cues
+%   (sans_indice) or cues (avec_indice); the step 1 folder follows
+%   (...\nocues\<folder> or ...\cues\<folder>).
+%
 %   Colours are shown only once step 3 is done for the session: the choice
 %   of the settings and of K must stay blind to the colours.
 %   Interface settings apply to the run; they do not modify
@@ -33,7 +37,11 @@ dossier_pipeline = fileparts(mfilename('fullpath'));
 addpath(genpath(dossier_pipeline));
 
 config0 = config_brainbow();
-dossier_resultats = config0.PathSave;   % step 1 folder (one subfolder per session); main analysis there too
+% 19 nov. (demandé par l'utilisateur) : condition affichée (sessions de la
+% table), au choix dans l'interface ; config_brainbow.m n'est pas modifié
+condition_courante = 'sans_indice';
+if numel(config0.conditions) == 1, condition_courante = config0.conditions{1}; end
+dossier_resultats = dossier_condition();   % step 1 folder (one subfolder per session); main analysis there too
 nom_analyse = '';                       % steps 2-4: '' = main analysis, otherwise <step 1 folder>\analyses\<name>
 noms_analyses = {};                     % analyses found in <step 1 folder>\analyses
 minimum_SCE_calcule = 5;      % absolute minimum of cells in an SCE when the threshold is computed
@@ -77,7 +85,14 @@ dd_reg = placer(uidropdown(gr, 'Items', {'validated', 'old + rank'}, ...
     'ValueChangedFcn', @(~, ~) changer_reglage(), ...
     'Tooltip', sprintf(['validated: curveball, rank, weighted RACEORTHO, global FDR (no false ' ...
     'assembly on shuffled 444119)\nold + rank: old null models + rank (4 assemblies on ' ...
-    '444119 at K = 9, but 1.3 false assemblies per shuffle)\nResults in separate folders'])), 1, [2 4]);
+    '444119 at K = 9, but 1.3 false assemblies per shuffle)\nResults in separate folders'])), 1, 2);
+dd_cond = placer(uidropdown(gr, 'Items', {'no cues', 'cues'}, ...
+    'ItemsData', {'sans_indice', 'avec_indice'}, 'Value', condition_courante, ...
+    'ValueChangedFcn', @(src, ~) changer_condition(src.Value), ...
+    'Tooltip', sprintf(['Sessions shown and analysed: no cues (sans_indice) or cues (avec_indice).\n' ...
+    'Switches the step 1 folder to the default folder of that condition\n' ...
+    '(...\\nocues\\%s or ...\\cues\\%s). config_brainbow.m is not changed.'], ...
+    nom_dossier(config0.PathSave), nom_dossier(config0.PathSave))), 1, [3 4]);
 placer(uilabel(gr, 'Text', 'SCE threshold'), 2, 1);
 regle_initiale = 'percentile';
 if isfield(config0.pre, 'sce_regle') && ismember(config0.pre.sce_regle, {'percentile', 'fixe', 'fdr'})
@@ -613,7 +628,7 @@ rafraichir_table();
             return
         end
         config0 = config_brainbow(dd_reg.Value);
-        dossier_resultats = config0.PathSave;      % default folder of this setting
+        dossier_resultats = dossier_condition();   % default folder of this setting (and condition)
         ef_dossier.Value = dossier_resultats;
         ef_dossier.Tooltip = dossier_resultats;
         remplir_analyses('');                      % main analysis
@@ -627,6 +642,7 @@ rafraichir_table();
         % config_brainbow of the overall setting, with the folders chosen in
         % the interface (read again: takes your edits of the file into account)
         cfg = config_brainbow(dd_reg.Value);
+        cfg.conditions = {condition_courante};     % condition chosen in the interface (19 nov.)
         cfg.PathSave = dossier_resultats;
         cfg.analyse = nom_analyse;
         if isfield(cfg, 'PathSource'), cfg = rmfield(cfg, 'PathSource'); end
@@ -791,7 +807,35 @@ rafraichir_table();
 
     function dossier_defaut()
         % default folder of the overall setting (config0 read at click time)
-        changer_dossier(config0.PathSave);
+        changer_dossier(dossier_condition());
+    end
+
+    function d = dossier_condition()
+        % default step 1 folder of the overall setting for the chosen
+        % condition: config PathSave for no cues; for cues, the folder of the
+        % same name in ...\cues (next to ...\nocues)
+        d = config0.PathSave;
+        if strcmp(condition_courante, 'avec_indice')
+            racine_nocues = fileparts(d);
+            d = fullfile(fileparts(racine_nocues), 'cues', nom_dossier(d));
+        end
+    end
+
+    function n = nom_dossier(d)
+        [~, n, e] = fileparts(regexprep(char(d), '[\\/]+$', ''));
+        n = [n e];
+    end
+
+    function changer_condition(v)
+        % 19 nov. : no cues / cues ; table, folder and analyses follow
+        if en_cours
+            dd_cond.Value = condition_courante;
+            return
+        end
+        condition_courante = v;
+        selection = [];
+        journal(sprintf('Condition: %s', v));
+        changer_dossier(dossier_condition());
     end
 
     function changer_dossier(d)
@@ -802,7 +846,7 @@ rafraichir_table();
             return
         end
         d = strtrim(char(d));
-        if isempty(d), d = config0.PathSave; end
+        if isempty(d), d = dossier_condition(); end
         if ~isfolder(d)
             choix = uiconfirm(fig, sprintf(['This folder does not exist:\n%s\nCreate it? ' ...
                 '(step 1 must then be run there)'], d), ...

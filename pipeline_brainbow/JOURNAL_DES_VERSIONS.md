@@ -6,6 +6,45 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.19b (19 nov.)
+- Interface : menu de condition à côté de « Overall setting » (*no cues* /
+  *cues*). Il choisit les sessions de la table (`sans_indice` ou
+  `avec_indice`) et met le dossier de l'étape 1 sur le dossier par défaut de
+  la condition (`...\nocues\resultats_reglage1` ou
+  `...\cues\resultats_reglage1`) ; les analyses de ce dossier apparaissent
+  dans « Analysis ». Les lancements depuis l'interface utilisent cette
+  condition. `config_brainbow.m` n'est pas modifié. Aucun résultat ne change.
+
+## 2026.11.19a (19 nov.)
+- `config.pre.detection = 'cascade_discrets'` (nouveau, facultatif ; champ
+  absent = détection actuelle, rien ne change) : raster = potentiels
+  d'action discrets de CASCADE (`infer_discrete_spikes`, aucun réglage,
+  graine fixée `cascade_graine`), 1 à chaque image avec au moins 1 PA, au
+  repos seulement. Pas de regroupement en événements. Nouvelles fonctions
+  `1_fonctionnel/transient_detection_cascade_discrets`, `cascade_discrets.py`
+  (en parallèle, `cascade_processus`, 24 par défaut). PA gardés dans le
+  dossier suite2p (`cascade_discrets_<modele>.mat`).
+- Test demandé : 34 sessions nocues, étapes 1-2, cellules hyperactives non
+  retirées (`retirer_hyperactives = false` pour ce test seulement).
+
+## 2026.11.18b (18 nov., soir)
+- `config.pre.detection = 'cascade'` (nouveau, facultatif ; champ absent =
+  détection actuelle, rien ne change) : événements tirés de la déconvolution
+  CASCADE (Rupprecht et al. 2021), modèle `GC8_EXC_10Hz_smoothing150ms_high_noise`
+  (`config.pre.cascade_modele`), sur DFF0 non lissé. Événement = suite
+  d'images > `cascade_seuil_image` (0,1 potentiel / image) ; gardé si sa
+  taille (potentiels estimés) >= `cascade_min_spikes` (1 par défaut ; 2-3 =
+  bouffées seulement) et si son maximum est au repos.
+  Nouvelles fonctions `1_fonctionnel/transient_detection_cascade`,
+  `cascade_spikes` (appelle `cascade_lancer.py`). CASCADE installé dans
+  `C:\Users\jcplatel\Desktop\matlab\Cascade` (environnement Python
+  `venv_cascade`, TensorFlow 2.3). spike_prob gardé dans le dossier de la
+  session (`cascade_<modele>.mat`), recalculé si la trace change.
+- Hors pipeline (même jour) : masques suite2p corrigés pour 446178 et 446198
+  (`color_maxwellV2/corriger_masques`, `charger_masques`) et fluorescences
+  recalculées avec ces masques (`assembly_final/reextraire_fluo_masques`,
+  ancien fichier gardé en `data_recording_avant_masquescorr.mat`).
+
 ## 2026.11.18a (18 nov.)
 - `config.pre.detection` (nouveau, facultatif ; champ absent = détection
   actuelle, rien ne change) : `'arnaud'` = détection de preprocessing_Arnaud

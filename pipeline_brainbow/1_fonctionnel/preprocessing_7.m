@@ -106,7 +106,17 @@ WinRest = find(WinRest_bin);
 
 %% DÉTECTION DES TRANSIENTS
 info_bouffees = [];
-if isfield(opts, 'detection') && ~strcmpi(opts.detection, 'standard')
+if isfield(opts, 'detection') && strcmpi(opts.detection, 'cascade')
+    % 18 nov. (demandé par l'utilisateur) : événements de la déconvolution
+    % CASCADE (modèle GCaMP8), sur DFF0 non lissé
+    [Raster, Acttmp2, th_detection, PromALL, WidthALL, info_bouffees] = ...
+        transient_detection_cascade(DFF0, WinRest, path, sampling_rate, opts);
+elseif isfield(opts, 'detection') && strcmpi(opts.detection, 'cascade_discrets')
+    % 19 nov. (demandé par l'utilisateur) : potentiels d'action discrets de
+    % CASCADE (infer_discrete_spikes) ; 1 par image avec au moins 1 PA, au repos
+    [Raster, Acttmp2, th_detection, PromALL, WidthALL, info_bouffees] = ...
+        transient_detection_cascade_discrets(DFF0, WinRest, path, sampling_rate, opts);
+elseif isfield(opts, 'detection') && ~strcmpi(opts.detection, 'standard')
     % 18 nov. (test demandé par l'utilisateur) : exclusion des bouffées
     % d'après le code d'Arnaud ; sans le champ opts.detection, rien ne change
     [Raster, Acttmp2, th_detection, PromALL, WidthALL, info_bouffees] = ...
