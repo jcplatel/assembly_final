@@ -14,17 +14,36 @@ function [Raster, Acttmp2, th_detection, PromALL, WidthALL, info] = ...
 %  Sorties comme transient_detection_shot_theta2 : Acttmp2{i} = images avec
 %  PA ; PromALL{i} = nombre de PA à ces images ; WidthALL{i} = 1 ;
 %  th_detection = NaN (pas de seuil).
-%  opts : cascade_modele, cascade_processus (défaut 24), cascade_graine (1).
+%  opts : cascade_modele, cascade_processus (défaut 24), cascade_graine (1),
+%         cascade_reechantillonnage_Hz (défaut [] : aucun).
+%  20 nov. (demandé par l'utilisateur) : cascade_reechantillonnage_Hz = 15
+%  pour un modèle entraîné à 15 Hz (ex. GC8m_EXC_15Hz_smoothing50ms_high_noise) :
+%  DFF0 interpolé (linéaire) sur une grille à 15 Hz, CASCADE et PA discrets à
+%  15 Hz, puis chaque PA ramené à l'image d'origine la plus proche dans le
+%  temps (somme des PA par image). Caches suffixés _<Hz>Hz (PA à 15 Hz).
+%  L'interpolation n'ajoute pas d'information temporelle et lisse le bruit.
 %  =========================================================================
 if isfield(opts, 'cascade_modele'), modele = opts.cascade_modele;
 else, modele = 'GC8_EXC_10Hz_smoothing150ms_high_noise'; end
 if isfield(opts, 'cascade_processus'), n_proc = opts.cascade_processus; else, n_proc = 24; end
 if isfield(opts, 'cascade_graine'), graine = opts.cascade_graine; else, graine = 1; end
+hz = [];
+if isfield(opts, 'cascade_reechantillonnage_Hz'), hz = opts.cascade_reechantillonnage_Hz; end
+[NCell0, Nz0] = size(DFF0);
+suffixe = '';
+if ~isempty(hz)
+    suffixe = sprintf('_%gHz', hz);
+    t0 = (0:Nz0 - 1) / sampling_rate;
+    t_r = 0:1 / hz:t0(end);
+    DFF0 = interp1(t0, double(DFF0)', t_r, 'linear')';
+    if NCell0 == 1, DFF0 = DFF0(:)'; end
+    image_origine = min(Nz0, round(t_r * sampling_rate) + 1);   % image d'origine la plus proche
+end
 o = opts; o.cascade_modele = modele;
-sp = cascade_spikes(DFF0, o, fullfile(path, ['cascade_' modele '.mat']));
+sp = cascade_spikes(DFF0, o, fullfile(path, ['cascade_' modele suffixe '.mat']));
 
 % PA discrets (gardés : relus si même spike_prob, même modèle, même graine)
-fc = fullfile(path, ['cascade_discrets_' modele '.mat']);
+fc = fullfile(path, ['cascade_discrets_' modele suffixe '.mat']);
 controle = [sum(sp(:), 'omitnan'), sum(abs(sp(:)), 'omitnan')];
 n_pa = [];
 if isfile(fc)
@@ -55,6 +74,11 @@ if isempty(n_pa)
     n_pa_s = single(n_pa); %#ok<NASGU>
     sauver(fc, n_pa_s, modele, graine, controle);
 end
+if ~isempty(hz)
+    % PA à 15 Hz -> images d'origine (somme des PA tombés dans chaque image)
+    M = sparse(1:numel(image_origine), image_origine, 1, numel(image_origine), Nz0);
+    n_pa = full(double(n_pa) * M);
+end
 
 [NCell, Nz] = size(n_pa);
 repos = false(1, Nz); repos(WinRest) = true;
@@ -66,7 +90,7 @@ for i = 1:NCell
 end
 th_detection = nan(1, NCell);
 min_repos = numel(WinRest) / sampling_rate / 60;
-info = struct('modele', modele, 'graine', graine, ...
+info = struct('modele', modele, 'graine', graine, 'reechantillonnage_Hz', hz, ...
     'PA_par_min_repos', sum(n_pa(:, repos), 2) / max(eps, min_repos), ...
     'images_PA_par_min_repos', sum(Raster, 2) / max(eps, min_repos));
 end

@@ -6,6 +6,18 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.20c (20 nov.)
+- Détection `cascade_discrets`, nouvelle option
+  `config.pre.cascade_reechantillonnage_Hz` (défaut : absente, rien ne
+  change) : pour un modèle CASCADE entraîné à une autre fréquence (ex.
+  `GC8m_EXC_15Hz_smoothing50ms_high_noise`, entraîné sur GCaMP8m), DFF0 est
+  interpolé (linéaire) sur une grille à cette fréquence, CASCADE et les PA
+  discrets y sont calculés, puis chaque PA est ramené à l'image d'origine la
+  plus proche dans le temps (somme par image). Caches suffixés `_<Hz>Hz`
+  dans le dossier suite2p. L'interpolation n'ajoute pas d'information
+  temporelle. L'interface ne trouve pas ces caches : son raster d'activité
+  montre alors le `Raster` de l'étape 1 (repos seulement).
+
 ## 2026.11.20b (20 nov.)
 - `interface_brainbow`, **correction** du raster d'activité avec la
   détection CASCADE (`opts.detection = 'cascade_discrets'`) : il était vide,
