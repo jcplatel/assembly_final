@@ -1265,7 +1265,7 @@ rafraichir_table();
 
         dessiner_raster(Race, A, cols, K, quelles);
         try
-            dessiner_activite(ds, A, cols, NCell, quelles);
+            dessiner_activite(ds, A, cols, NCell, quelles, char(sessions.dossier_suite2p{s}));
         catch err
             message_axes(ax_act, {'Activity raster unavailable:', err.message});
         end
@@ -1386,10 +1386,10 @@ rafraichir_table();
         title(ax_raster, sprintf('SCEs by assembly (%s)', texte_K(K, true)), 'FontWeight', 'normal');
     end
 
-    function dessiner_activite(d, A, cols, NCell, quelles)
+    function dessiner_activite(d, A, cols, NCell, quelles, dossier_s2p)
         % Activity raster (cells x time, whole session) sorted like the SCE
         % raster (assemblies at the bottom), with the speed above.
-        act = activite_session(d);
+        act = activite_session(d, dossier_s2p);
         if act.NCell ~= NCell
             message_axes(ax_act, {'Different number of cells between files'});
             return
@@ -1448,7 +1448,7 @@ rafraichir_table();
         ax_act.XLim = [0 act.Nz / act.fs];
         ylabel(ax_act, 'Cells (sorted)');
         xlabel(ax_act, 'Time (s)');
-        title(ax_act, 'Activity: transient peaks (coloured: during the SCEs of their assembly)', ...
+        title(ax_act, sprintf('Activity: %s (coloured: during the SCEs of their assembly)', act.source), ...
             'FontWeight', 'normal');
 
         % Speed, and SCE times (triangle in the colour of the active assembly)
@@ -1485,9 +1485,15 @@ rafraichir_table();
         end
     end
 
-    function act = activite_session(d)
+    function act = activite_session(d, dossier_s2p)
         % Peaks of all transients (running included), with each cell's
         % threshold used by the detection; kept in memory.
+        % 20 nov. (request of the user): CASCADE discrete spikes have no
+        % threshold (th_detection = NaN), so findpeaks gave an empty raster.
+        % For opts.detection = 'cascade_discrets': frames with >= 1 spike, read
+        % from the spike cache of the suite2p folder (whole session, running
+        % included); without the cache: Raster of step 1 (rest only).
+        if nargin < 2, dossier_s2p = ''; end
         if isKey(cache_act, d)
             act = cache_act(d);
             return
@@ -1501,17 +1507,41 @@ rafraichir_table();
         if isfield(P, 'opts') && isfield(P.opts, 'MinPeakDistance'), mpd = P.opts.MinPeakDistance; end
         sync = 2;
         if isfield(P, 'opts') && isfield(P.opts, 'synchronous_frames'), sync = P.opts.synchronous_frames; end
-        ci = cell(NC, 1);
-        ti = cell(NC, 1);
-        for i = 1:NC
-            if ~(P.th_detection(i) > 0), continue; end
-            [~, locs] = findpeaks(double(P.Tr1b(i, :)), 'MinPeakProminence', P.th_detection(i), ...
-                'MinPeakDistance', mpd);
-            ti{i} = locs(:);
-            ci{i} = repmat(i, numel(locs), 1);
+        cascade = isfield(P, 'opts') && isfield(P.opts, 'detection') && ...
+            strcmpi(P.opts.detection, 'cascade_discrets');
+        source = 'transient peaks';
+        if cascade
+            modele = 'GC8_EXC_10Hz_smoothing150ms_high_noise';
+            if isfield(P.opts, 'cascade_modele'), modele = P.opts.cascade_modele; end
+            n_pa = [];
+            fc = fullfile(dossier_s2p, ['cascade_discrets_' modele '.mat']);
+            if ~isempty(dossier_s2p) && isfile(fc)
+                C = load(fc, 'n_pa');
+                if isequal(size(C.n_pa), [NC, Nz]), n_pa = C.n_pa; end
+            end
+            if ~isempty(n_pa)
+                [ci, ti] = find(n_pa > 0);
+                source = 'CASCADE spikes (frames with >= 1 spike)';
+            else
+                R = load(f, 'Raster');
+                [ci, ti] = find(R.Raster > 0);
+                source = 'CASCADE spikes, rest only (spike cache not found)';
+            end
+            ci = ci(:);
+            ti = ti(:);
+        else
+            ci = cell(NC, 1);
+            ti = cell(NC, 1);
+            for i = 1:NC
+                if ~(P.th_detection(i) > 0), continue; end
+                [~, locs] = findpeaks(double(P.Tr1b(i, :)), 'MinPeakProminence', P.th_detection(i), ...
+                    'MinPeakDistance', mpd);
+                ti{i} = locs(:);
+                ci{i} = repmat(i, numel(locs), 1);
+            end
+            ti = vertcat(ti{:});
+            ci = vertcat(ci{:});
         end
-        ti = vertcat(ti{:});
-        ci = vertcat(ci{:});
         if isfield(P, 'bad_frames') && numel(P.bad_frames) == Nz && ~isempty(ti)
             ok = ~logical(P.bad_frames(ti));
             ti = ti(ok);
@@ -1526,6 +1556,7 @@ rafraichir_table();
         act.vitesse = vitesse;
         act.TRace = TRace;
         act.sync = sync;
+        act.source = source;
         cache_act(d) = act;
     end
 

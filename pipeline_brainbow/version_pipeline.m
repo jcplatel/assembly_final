@@ -4,5 +4,5 @@ function v = version_pipeline()
 %   zip envoyé. Changée à chaque nouvel envoi du code ; le détail des
 %   changements est dans JOURNAL_DES_VERSIONS.md (même dossier).
 %   Format : année.mois.jour, puis une lettre si plusieurs versions le même jour.
-v = '2026.11.20a';
+v = '2026.11.20b';
 end

@@ -6,6 +6,16 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.20b (20 nov.)
+- `interface_brainbow`, **correction** du raster d'activité avec la
+  détection CASCADE (`opts.detection = 'cascade_discrets'`) : il était vide,
+  car il refaisait findpeaks avec `th_detection`, qui vaut NaN pour CASCADE.
+  Il montre maintenant les images avec au moins 1 PA, lues dans le cache
+  `cascade_discrets_<modèle>.mat` du dossier suite2p (session entière,
+  course comprise) ; sans ce cache, le `Raster` de l'étape 1 (repos
+  seulement). Le titre dit d'où viennent les points. Rien ne change pour
+  la détection actuelle, ni pour les calculs du pipeline.
+
 ## 2026.11.20a (20 nov.)
 - Étape 5, **correction** de la p du rho de chaque session (k-fold) : le
   hasard échange maintenant les cellules entre elles une seule fois pour
