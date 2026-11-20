@@ -21,6 +21,18 @@ opts.kfold_repetitions      = 20;    % mélanges : 5 x 20 = 100 coupures
 opts.kfold_min_courses      = 10;    % en dessous : 2 paquets (50/50), 50 mélanges
 opts.kfold_nPerm            = 1000;  % permutations pour la p du rho moyen
 opts.kfold_seuil_valide     = 0.5;   % cellule validée : retenue ET retrouvée dans >= 50 % des coupures
+% 20 nov. (choix de l'utilisateur) : choix des cellules de la séquence
+opts.selection              = 'otsu';   % 'otsu' = avant (courses collées, seuil d'Otsu) ; 'faux_debuts' = test par cellule
+opts.max_lag_s              = 40;    % 'faux_debuts' : décalage maximal (s), signal continu
+opts.n_faux_debuts          = 500;   % 'faux_debuts' : tirages de faux débuts (pendant la course)
+opts.fdr_sequence           = 0.05;  % 'faux_debuts' : FDR sur les cellules de la session
+% 20 nov. (choix de l'utilisateur) : cellules robustes = validées ET position stable
+opts.cellules_tests         = 'validees';   % 'validees' = avant ; 'robustes' = validées ET position stable
+opts.stabilite_nPerm        = 1000;  % mélanges des positions de test, par coupure
+opts.stabilite_fdr          = 0.05;  % FDR sur les cellules validées de la session
+% 20 nov. (choix de l'utilisateur) : signal utilisé
+opts.signal                 = 'calcium';   % 'calcium' = F de data_recording (avant) ; 'cascade' = probabilité de spike
+opts.cascade_modele         = 'GC8_EXC_10Hz_smoothing150ms_high_noise';   % 'cascade' : fichier cascade_<modèle>.mat
 if isfield(config, 'seq') && isstruct(config.seq)
     noms = fieldnames(config.seq);
     for k = 1:numel(noms)

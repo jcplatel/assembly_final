@@ -28,11 +28,26 @@ function statut = etape5_sequences(session, config)
 %  par permutation ; test de couleur sur les cellules validées (>= 50 % des
 %  coupures), rangées par leur décalage moyen sur les courses de test.
 %  La coupure 50/50 unique reste pour la figure (rho_moitie, p_rho_moitie).
+%  20 nov. (choix de l'utilisateur) : opts.selection = 'faux_debuts'
+%  (choisir_cellules_sequence -> decalage_cellules_test) : même corrélation
+%  croisée, mais sur le signal continu (courses non collées), décalage
+%  jusqu'à opts.max_lag_s (40 s), et seuil par cellule contre des faux
+%  débuts tirés pendant la course (opts.n_faux_debuts = 500), FDR 5 %, à la
+%  place d'Otsu. 'otsu' = méthode d'avant.
+%  20 nov. : opts.cellules_tests = 'robustes' : tests de couleur et
+%  d'assemblées sur les cellules validées ET de position stable
+%  (validation_kfold, ordre_robuste) ; 'validees' = avant.
+%  20 nov. : opts.signal = 'cascade' : même analyse sur la probabilité de
+%  spike de CASCADE au lieu du calcium ; résultats dans
+%  <session>\sequences_cascade (dossier_sequences).
+%  Assemblées (sequence_assemblees) : assemblées du K retenu à l'étape 2,
+%  enrichies en cellules de la séquence ? regroupées dans la séquence ?
+%  (mêmes cellules et même ordre que le test de couleur).
 %  Écrit <session>\sequences\sequences.mat et sequence_session.png.
 %  =========================================================================
 
 opts = options_sequences(config);
-dossier = fullfile(session.dossier, 'sequences');
+dossier = fullfile(session.dossier, dossier_sequences(opts));   % 'sequences' (calcium) ou 'sequences_cascade'
 if ~isfolder(dossier), mkdir(dossier); end
 fichier = fullfile(dossier, 'sequences.mat');
 if isfile(fichier), delete(fichier); end
@@ -44,15 +59,35 @@ speed = double(S.data_recording.speed(:)');
 fs = S.data_recording.sampling_rate;
 clear S
 [NCell, Nz] = size(F);
-DF = F;
-ws = warning('off', 'all');
-for i = 1:NCell
-    p0 = polyfit(1:Nz, DF(i, :), 3);
-    DF(i, :) = DF(i, :) ./ polyval(p0, 1:Nz);
+if strcmp(opts.signal, 'cascade')
+    % 20 nov. (choix de l'utilisateur) : probabilité de spike de CASCADE
+    % (spike_prob, PA estimés par image, déjà lissés sur 150 ms), calculée
+    % à l'étape 1 (cascade_<modèle>.mat dans le dossier suite2p). Pas de
+    % polynôme ni de Savitzky-Golay ; NaN des bords (fenêtre CASCADE) mis à
+    % 0 ; z-score par cellule comme pour le calcium.
+    fc = fullfile(session.dossier_suite2p, ['cascade_' opts.cascade_modele '.mat']);
+    if ~isfile(fc)
+        error('CASCADE pas calculé pour cette session (%s absent)', fc);
+    end
+    C = load(fc, 'spike_prob');
+    DF = double(C.spike_prob);
+    clear C
+    if ~isequal(size(DF), [NCell, Nz])
+        error('CASCADE : taille %dx%d, data_recording %dx%d', size(DF, 1), size(DF, 2), NCell, Nz);
+    end
+    DF(~isfinite(DF)) = 0;
+else
+    DF = F;
+    ws = warning('off', 'all');
+    for i = 1:NCell
+        p0 = polyfit(1:Nz, DF(i, :), 3);
+        DF(i, :) = DF(i, :) ./ polyval(p0, 1:Nz);
+    end
+    warning(ws);
+    DF = sgolayfilt(DF', 3, 5)';
 end
-warning(ws);
-DF = sgolayfilt(DF', 3, 5)';
 DF = normalize(DF, 2, 'zscore');
+DF(~isfinite(DF)) = 0;      % cellule sans aucune activité (écart-type nul)
 clear F
 
 % vitesse : même longueur que la fluorescence (comme preprocessing_7)
@@ -75,6 +110,12 @@ garder = debuts >= 1;
 debuts = debuts(garder);
 fins = fins(garder);
 n_courses = numel(debuts);
+trames_course = find(en_course);       % candidats pour les faux débuts
+if strcmp(opts.selection, 'faux_debuts')
+    opts.max_lag_trames = round(opts.max_lag_s * fs);
+else
+    opts.max_lag_trames = opts.max_lag;
+end
 
 R = struct();
 R.nom = session.nom;
@@ -102,12 +143,14 @@ n_app = max(1, min(n_courses - 1, round(n_courses * opts.fraction_apprentissage)
 courses_app = sort(melange(1:n_app));
 courses_test = sort(melange(n_app + 1:end));
 
+% (seuil_* = seuil d'Otsu en mode 'otsu', p de chaque cellule en mode 'faux_debuts')
+fixer_flux_aleatoire(session.graine, 10, 1);
 [R.corr_app, R.decalage_app, R.seuil_app, R.sequence_app, R.ordre_app] = ...
-    decalage_cellules(DF, debuts, fins, courses_app, opts.max_lag);
+    choisir_cellules_sequence(DF, debuts, fins, courses_app, opts, trames_course);
 [R.corr_test, R.decalage_test, R.seuil_test, R.sequence_test] = ...
-    decalage_cellules(DF, debuts, fins, courses_test, opts.max_lag);
+    choisir_cellules_sequence(DF, debuts, fins, courses_test, opts, trames_course);
 [R.corr_tout, R.decalage_tout, R.seuil_tout, R.sequence_tout, R.ordre_tout] = ...
-    decalage_cellules(DF, debuts, fins, 1:n_courses, opts.max_lag);
+    choisir_cellules_sequence(DF, debuts, fins, 1:n_courses, opts, trames_course);
 R.courses_app = courses_app;
 R.courses_test = courses_test;
 
@@ -129,15 +172,20 @@ R.validation = 'moitie (1 coupure 50/50)';
 R.rho_moitie = R.rho; R.p_rho_moitie = R.p_rho;
 ordre_couleur = R.ordre_tout;
 if strcmp(opts.validation, 'kfold')
-    V = validation_kfold(DF, debuts, fins, opts, session.graine);
+    V = validation_kfold(DF, debuts, fins, opts, session.graine, trames_course);
     R.kfold = V;
     R.validation = V.validation;
     R.rho = V.rho; R.p_rho = V.p_rho;
     R.n_sequence = V.n_sequence;            % moyenne sur les coupures (courses d'apprentissage)
     R.n_deux = V.n_deux; R.n_deux_hasard = V.n_deux_hasard;
     R.n_validees = V.n_validees;
+    R.n_robustes = V.n_robustes;
     ordre_couleur = V.ordre_valide;         % test de couleur : cellules validées, ordre sur les courses de test
+    if strcmp(opts.cellules_tests, 'robustes')
+        ordre_couleur = V.ordre_robuste;    % 20 nov. : validées ET position stable
+    end
 end
+R.cellules_tests = opts.cellules_tests;
 
 %% 5. Activité moyenne autour du début de course (figure)
 psth = @(courses) moyenne_autour(DF, debuts(courses), opts.psth_avant, opts.psth_apres);
@@ -163,11 +211,38 @@ for k = 1:numel(noms_c)
     R.(['coul_' noms_c{k}]) = Cc.(noms_c{k});
 end
 
+%% 7. Assemblées (étape 2) : suivent-elles la séquence ? (20 nov.)
+R.asm_statut = 'pas d''assemblées';
+try
+    choix = load(fullfile(session.dossier, 'choix_K.mat'));
+    if strcmp(choix.statut_choix, 'ok')
+        fichier_asm = fichier_assemblees(session.dossier, session.dossier_source, choix.best_K);
+        As = load(fichier_asm, 'assemblyortho');
+        R.asm_K = choix.best_K;
+        R.assemblees = As.assemblyortho;
+        Ca = sequence_assemblees(ordre_couleur, NCell, As.assemblyortho, opts.nPerm_couleur, ...
+            opts.min_paires_meme, session.graine);
+        noms_a = fieldnames(Ca);
+        for k = 1:numel(noms_a)
+            R.(['asm_' noms_a{k}]) = Ca.(noms_a{k});
+        end
+        R.asm_statut = 'ok';
+    else
+        R.asm_statut = choix.statut_choix;
+    end
+catch err
+    R.asm_statut = ['erreur : ' err.message];
+end
+
 statut = sprintf(['%d courses, %.0f/%d cellules dans la séquence (%.0f %%), ordre sur les courses de test ' ...
     '(%s) : rho = %.2f, p = %.3g ; même couleur : %+.1f %% de distance dans la séquence, p = %.3g'], ...
     n_courses, R.n_sequence, NCell, 100 * R.n_sequence / NCell, R.validation, R.rho, R.p_rho, Cc.pct, Cc.p);
+if strcmp(R.asm_statut, 'ok')
+    statut = sprintf('%s ; assemblées : %d/%d enrichies, même assemblée %+.1f %%, p = %.3g', statut, ...
+        R.asm_n_enrichies, R.asm_n_assemblees, R.asm_pct, R.asm_p);
+end
 if isfield(R, 'n_validees')
-    statut = sprintf('%s ; %d cellules validées', statut, R.n_validees);
+    statut = sprintf('%s ; %d cellules validées, %d robustes', statut, R.n_validees, R.n_robustes);
 end
 R.statut = statut;
 save(fichier, '-struct', 'R');

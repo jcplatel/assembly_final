@@ -6,6 +6,37 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.20a (20 nov.)
+- Étape 5, **correction** de la p du rho de chaque session (k-fold) : le
+  hasard échange maintenant les cellules entre elles une seule fois pour
+  toutes les coupures. Avant, les décalages étaient mélangés
+  indépendamment dans chaque coupure ; comme les 100 coupures réutilisent
+  les mêmes courses, ce hasard était trop étroit et la p trop petite. Le
+  rho lui-même et le test par animal (Wilcoxon) ne changent pas ; le
+  nombre de sessions à p < 0,05 peut baisser.
+- Étape 5, nouveau : assemblées et séquence (`5_sequences/sequence_assemblees`),
+  sur les mêmes cellules et le même ordre que le test de couleur (cellules
+  validées) : (a) chaque assemblée du K retenu contient-elle plus de
+  cellules de la séquence que le hasard (hypergéométrique, FDR 5 % par
+  session) ; (b) les cellules d'une même assemblée sont-elles proches dans
+  la séquence (même test que la couleur, assemblées mélangées). Colonnes
+  `asm_*` dans `sequences_sessions.csv`, section dans `resume_sequences.txt`.
+- Testés, pas retenus (options gardées, valeurs par défaut inchangées) :
+  - `config.seq.selection = 'faux_debuts'` (avant et toujours : `'otsu'`) :
+    signal continu, décalage jusqu'à 40 s, test par cellule contre des faux
+    débuts tirés pendant la course, FDR. Presque aucune cellule ne passe
+    (0 à 18 par session). Fonctions `decalage_cellules_test`,
+    `choisir_cellules_sequence`.
+  - `config.seq.cellules_tests = 'robustes'` (gardé : `'validees'`) :
+    cellules validées ET de position stable entre apprentissage et test
+    (FDR). Une fois le hasard corrigé, aucune cellule ne passe : la
+    séquence est une tendance d'ensemble, pas un ordre fiable cellule par
+    cellule. L'écart de position (`ecart_position`, `p_stabilite`) reste
+    calculé dans `R.kfold`.
+- `validation_kfold` : coupures en parallèle (parfor), décalages de chaque
+  coupure gardés pour les permutations.
+- Étape 5 à relancer (cues et nocues). Étapes 1 à 4 inchangées.
+
 ## 2026.11.19c (19 nov.)
 - Étape 5 (séquences), choix de l'utilisateur : validation croisée répétée
   (`config.seq.validation = 'kfold'`, avant `'moitie'`, ancienne valeur en

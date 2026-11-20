@@ -270,6 +270,19 @@ config.seq.kfold_repetitions      = 20;    % 5 x 20 = 100 coupures
 config.seq.kfold_min_courses      = 10;    % en dessous : 50/50 x 50 (100 coupures)
 config.seq.kfold_nPerm            = 1000;  % permutations pour la p du rho moyen de chaque session
 config.seq.kfold_seuil_valide     = 0.5;   % test de couleur : cellules retenues ET retrouvées dans >= 50 % des coupures
+config.seq.selection              = 'otsu';   % 'otsu' = méthode d'origine (courses collées, seuil d'Otsu), gardée (20 nov.)
+                                           % 'faux_debuts' (testé le 20 nov., pas retenu : presque aucune cellule ne passe) :
+                                           % signal continu, test par cellule contre des faux débuts
+config.seq.max_lag_s              = 40;    % 'faux_debuts' seulement : décalage maximal (s)
+config.seq.n_faux_debuts          = 500;   % 'faux_debuts' seulement : tirages de faux débuts (pendant la course)
+config.seq.fdr_sequence           = 0.05;  % 'faux_debuts' seulement : FDR sur les cellules de la session
+config.seq.cellules_tests         = 'validees';   % cellules des tests de couleur et d'assemblées : 'validees' = validées
+                                           % 'robustes' = validées ET position stable (testé le 20 nov., pas retenu :
+                                           % aucune cellule ne passe une fois le hasard corrigé)
+config.seq.stabilite_nPerm        = 1000;  % test de stabilité de position : mélanges par coupure
+config.seq.stabilite_fdr          = 0.05;  % FDR sur les cellules validées de la session
+config.seq.signal                 = 'calcium';   % 'calcium' = F de data_recording ; 'cascade' = probabilité de spike
+                                           % de CASCADE (20 nov., à tester ; résultats dans sequences_cascade)
 
 %% ---------- Étape 4 : agrégation (= agregation_stats_clonales2) -------
 config.agreg.fdr_seuil            = 0.10;

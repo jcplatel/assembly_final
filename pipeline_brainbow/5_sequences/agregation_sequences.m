@@ -14,15 +14,20 @@ function T = agregation_sequences(sessions, config)
 %   sequences_agregation.mat, resume_sequences.txt, sequences.png,
 %   sequence_colour.png.
 
-dossier = fullfile(config.PathSave, 'sequences_agregation');
+opts_s = options_sequences(config);
+dossier = fullfile(config.PathSave, strrep(dossier_sequences(opts_s), 'sequences', 'sequences_agregation'));   % 20 nov. : '_cascade' si signal CASCADE
 if ~isfolder(dossier), mkdir(dossier); end
 statuts = {};
 validations = {};
 lignes = cell(0, 22);
+% 20 nov. : assemblées et séquence (sequence_assemblees)
+champs_a = {'asm_n_assemblees', 'asm_n_enrichies', 'asm_frac_seq_assemblees', 'asm_frac_seq_toutes', ...
+    'asm_n_cellules_paires', 'asm_n_meme', 'asm_delta', 'asm_pct', 'asm_p', 'n_robustes'};
+lignes_a = zeros(0, numel(champs_a));
 champs_c = {'coul_n_colorees', 'coul_n_meme', 'coul_n_diff', 'coul_d_meme', 'coul_d_diff', 'coul_delta', ...
     'coul_pct', 'coul_p', 'coul_rho_espace'};
 for s = 1:height(sessions)
-    f = fullfile(sessions.dossier{s}, 'sequences', 'sequences.mat');
+    f = fullfile(sessions.dossier{s}, dossier_sequences(opts_s), 'sequences.mat');
     if ~isfile(f), continue; end
     vars = intersect([{'NCell', 'n_courses', 'duree_course_s', 'n_sequence', 'n_sequence_tout', 'n_deux', ...
         'n_deux_hasard', 'rho', 'p_rho', 'statut', 'validation', 'n_validees'}, champs_c], who('-file', f));
@@ -37,6 +42,14 @@ for s = 1:height(sessions)
         R.rho, R.p_rho, R.coul_n_colorees, R.coul_n_meme, R.coul_n_diff, R.coul_d_meme, R.coul_d_diff, ...
         R.coul_delta, R.coul_pct, R.coul_p, R.coul_rho_espace, R.n_validees}; %#ok<AGROW>
     statuts{size(lignes, 1), 1} = R.statut; %#ok<AGROW>
+    va = intersect(champs_a, who('-file', f));
+    Ra = struct();
+    if ~isempty(va), Ra = load(f, va{:}); end
+    la = nan(1, numel(champs_a));
+    for c = 1:numel(champs_a)
+        if isfield(Ra, champs_a{c}), la(c) = double(Ra.(champs_a{c})); end
+    end
+    lignes_a(end+1, :) = la; %#ok<AGROW>
 end
 T = table();
 if isempty(lignes)
@@ -48,6 +61,9 @@ T = cell2table(lignes, 'VariableNames', {'animal', 'session', 'n_cellules', 'n_c
     'p_rho', 'n_colorees_seq', 'n_paires_meme', 'n_paires_diff', 'dist_meme', 'dist_diff', 'delta_couleur', ...
     'pct_couleur', 'p_couleur', 'rho_espace', 'n_validees'});
 T.validation = validations;
+for c = 1:numel(champs_a)
+    T.(champs_a{c}) = lignes_a(:, c);
+end
 T.statut = statuts;
 writetable(T, fullfile(dossier, 'sequences_sessions.csv'));
 
@@ -92,8 +108,46 @@ if ~isempty(Tc)
         if numel(re) >= 2, bc.p_espace = signrank(re, 0); end
     end
 end
+% Assemblées (20 nov.) : enrichies en cellules de la séquence ? regroupées dans la séquence ?
+Ta = T(isfinite(T.asm_n_assemblees) & T.asm_n_assemblees > 0, :);
+ba = struct('n_sessions', height(Ta), 'n_assemblees', sum(Ta.asm_n_assemblees), ...
+    'n_enrichies', sum(Ta.asm_n_enrichies), 'n_animaux', 0, 'frac_asm', NaN, 'frac_toutes', NaN, ...
+    'p_enrichissement', NaN, 'n_plus', 0, 'n_sessions_reg', 0, 'n_sig_reg', 0, 'n_animaux_reg', 0, ...
+    'pct_moyen', NaN, 'p_regroupement', NaN, 'n_neg', 0);
+Aa = table();
+if ~isempty(Ta)
+    [G, anim] = findgroups(Ta.animal);
+    Aa = table(anim, splitapply(@(x) mean(x, 'omitnan'), Ta.asm_frac_seq_assemblees, G), ...
+        splitapply(@mean, Ta.asm_frac_seq_toutes, G), splitapply(@numel, Ta.asm_frac_seq_toutes, G), ...
+        'VariableNames', {'animal', 'frac_asm', 'frac_toutes', 'n_sessions'});
+    ba.n_animaux = height(Aa);
+    ba.frac_asm = mean(Aa.frac_asm, 'omitnan');
+    ba.frac_toutes = mean(Aa.frac_toutes);
+    ba.n_plus = sum(Aa.frac_asm > Aa.frac_toutes);
+    if height(Aa) >= 2
+        ba.p_enrichissement = signrank(Aa.frac_asm, Aa.frac_toutes, 'tail', 'right');
+    end
+    Tr = Ta(isfinite(Ta.asm_delta), :);
+    ba.n_sessions_reg = height(Tr);
+    ba.n_sig_reg = sum(Tr.asm_p < 0.05);
+    if ~isempty(Tr)
+        [G, anim] = findgroups(Tr.animal);
+        Ar = table(anim, splitapply(@mean, Tr.asm_delta, G), splitapply(@mean, Tr.asm_pct, G), ...
+            'VariableNames', {'animal', 'delta', 'pct'});
+        ba.n_animaux_reg = height(Ar);
+        ba.pct_moyen = mean(Ar.pct);
+        ba.n_neg = sum(Ar.delta < 0);
+        if height(Ar) >= 2
+            ba.p_regroupement = signrank(Ar.delta, 0, 'tail', 'left');
+        end
+        Aa = outerjoin(Aa, Ar, 'Keys', 'animal', 'MergeKeys', true);
+    end
+end
 kfold = any(startsWith(T.validation, {'5-fold', '2-fold'}));
-L = [resume(T, bilan, options_sequences(config), kfold), resume_couleur(bc, kfold)];
+L = [resume(T, bilan, opts_s, kfold), resume_couleur(bc, kfold, opts_s), resume_assemblees(ba)];
+if strcmp(opts_s.signal, 'cascade')
+    L = [{sprintf('SIGNAL : probabilité de spike de CASCADE (%s), pas le calcium.', opts_s.cascade_modele), ''}, L];
+end
 fid = fopen(fullfile(dossier, 'resume_sequences.txt'), 'w', 'n', 'UTF-8');
 if fid >= 0
     fprintf(fid, '%s\n', L{:});
@@ -102,7 +156,7 @@ end
 fprintf('\n%s\n', L{:});
 date_sequences = datestr(now, 'yyyy-mm-dd HH:MM'); %#ok<NASGU>
 lignes_resume = L; %#ok<NASGU>
-save(fullfile(dossier, 'sequences_agregation.mat'), 'T', 'A', 'bilan', 'Ac', 'bc', 'lignes_resume', ...
+save(fullfile(dossier, 'sequences_agregation.mat'), 'T', 'A', 'bilan', 'Ac', 'bc', 'Aa', 'ba', 'lignes_resume', ...
     'date_sequences');
 try
     figure_sequences(dossier);
@@ -120,8 +174,15 @@ end
 function L = resume(T, b, opts, kfold)
 if nargin < 4, kfold = false; end
 L = {};
-L{end+1} = sprintf(['SÉQUENCES PENDANT LA COURSE (étape 5, sans couleur ; méthode de sequence_2026_01_27 : ' ...
-    'corrélation croisée avec les débuts de course, seuil d''Otsu, décalage < 0) :']);
+if strcmp(opts.selection, 'faux_debuts')
+    L{end+1} = sprintf(['SÉQUENCES PENDANT LA COURSE (étape 5, sans couleur ; corrélation croisée avec les débuts ' ...
+        'de course sur le signal continu, décalage jusqu''à %g s ; cellule retenue si son pic dépasse celui de ' ...
+        '%d faux débuts tirés pendant la course, FDR %g %%, et décalage < 0) :'], opts.max_lag_s, ...
+        opts.n_faux_debuts, 100 * opts.fdr_sequence);
+else
+    L{end+1} = sprintf(['SÉQUENCES PENDANT LA COURSE (étape 5, sans couleur ; méthode de sequence_2026_01_27 : ' ...
+        'corrélation croisée avec les débuts de course, seuil d''Otsu, décalage < 0) :']);
+end
 L{end+1} = sprintf('   %d sessions sur %d analysées (au moins %d courses) ; %d animaux.', ...
     b.n_sessions, b.n_sessions_total, opts.min_courses, b.n_animaux);
 if b.n_sessions == 0, return; end
@@ -142,6 +203,12 @@ if kfold
         'des sessions) : %.0f (%.0f attendues si les deux choix étaient indépendants) ; cellules validées ' ...
         '(retenues et retrouvées dans >= %.0f %% des coupures) : %d.'], sum(Tok.n_retrouvees), ...
         sum(Tok.n_retrouvees_hasard), 100 * opts.kfold_seuil_valide, sum(Tok.n_validees, 'omitnan'));
+    if strcmp(opts.cellules_tests, 'robustes')
+        L{end+1} = sprintf(['   Cellules robustes (validées ET position stable entre apprentissage et test, FDR ' ...
+            '%g %%) : %d au total, médiane %s par session [%s-%s].'], 100 * opts.stabilite_fdr, ...
+            sum(Tok.n_robustes, 'omitnan'), nb(median(Tok.n_robustes, 'omitnan'), '%.0f'), ...
+            nb(min(Tok.n_robustes), '%.0f'), nb(max(Tok.n_robustes), '%.0f'));
+    end
     return
 end
 L{end+1} = sprintf(['   « Rangées sur la moitié des courses, les cellules gardent leur ordre sur l''autre ' ...
@@ -153,10 +220,13 @@ L{end+1} = sprintf(['   Cellules retrouvées dans la séquence de l''autre moiti
 end
 
 
-function L = resume_couleur(b, kfold)
+function L = resume_couleur(b, kfold, opts)
 if nargin < 2, kfold = false; end
 L = {''};
-if kfold
+if kfold && nargin >= 3 && strcmp(opts.cellules_tests, 'robustes')
+    quel_ordre = ['cellules robustes : validées par la validation croisée ET de position stable entre ' ...
+        'apprentissage et test (FDR 5 %), rangées par leur décalage moyen sur les courses de test'];
+elseif kfold
     quel_ordre = 'cellules validées par la validation croisée, rangées par leur décalage moyen sur les courses de test';
 else
     quel_ordre = 'ordre de toutes les courses';
@@ -175,6 +245,30 @@ L{end+1} = sprintf(['   « Les paires de même couleur sont %s %% %s dans la sé
 L{end+1} = sprintf(['   Contrôle : distance dans la séquence contre distance dans l''espace, rho de Spearman moyen ' ...
     'des animaux = %s (Wilcoxon bilatéral contre 0 : %s) ; proche de 0 = la séquence ne suit pas l''espace.'], ...
     nb(b.rho_espace_moyen, '%.3f'), pv(b.p_espace));
+end
+
+
+function L = resume_assemblees(b)
+L = {''};
+L{end+1} = ['ASSEMBLÉES (étape 2, SCE au repos) ET SÉQUENCE (mêmes cellules et même ordre que le test de ' ...
+    'couleur ; « dans la séquence » = parmi ces cellules) :'];
+if b.n_sessions == 0
+    L{end+1} = '   aucune session avec des assemblées.';
+    return
+end
+L{end+1} = sprintf(['   « Part des cellules d''assemblées dans la séquence : %s %% contre %s %% de toutes les ' ...
+    'cellules (moyenne des animaux), %d/%d animaux au-dessus, Wilcoxon unilatéral apparié sur les animaux %s ; ' ...
+    '%d/%d assemblées enrichies en cellules de la séquence (hypergéométrique, FDR 5 %% par session), %d ' ...
+    'sessions. »'], nb(100 * b.frac_asm, '%.0f'), nb(100 * b.frac_toutes, '%.0f'), b.n_plus, b.n_animaux, ...
+    pv(b.p_enrichissement), b.n_enrichies, b.n_assemblees, b.n_sessions);
+if b.n_sessions_reg == 0
+    L{end+1} = '   Regroupement : aucune session testable.';
+    return
+end
+L{end+1} = sprintf(['   « Les paires de cellules de la même assemblée sont %s %% %s dans la séquence que les ' ...
+    'paires d''assemblées différentes (moyenne des animaux), %d/%d animaux dans ce sens, Wilcoxon unilatéral ' ...
+    'sur les animaux %s ; %d/%d sessions à p < 0,05 (assemblées mélangées). »'], nb(abs(b.pct_moyen), '%.1f'), ...
+    texte_sens(b.pct_moyen), b.n_neg, b.n_animaux_reg, pv(b.p_regroupement), b.n_sig_reg, b.n_sessions_reg);
 end
 
 
