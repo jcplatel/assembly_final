@@ -6,6 +6,19 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.21a (21 nov.)
+- Deux nouvelles options du prétraitement, pour le screening des réglages
+  CASCADE. Sans ces champs dans `config.pre`, rien ne change (défauts = comme
+  avant), et les étapes 1 déjà faites restent à jour.
+  - `config.pre.cascade_min_pa` (détection `cascade_discrets`, défaut 1) :
+    une image compte comme événement si elle a au moins ce nombre de PA
+    (2 : seulement les images avec >= 2 PA, 8 à 20 % des événements).
+  - `config.pre.hyperactives_seuil_hz` (défaut 0,2) et
+    `config.pre.hyperactives_min` (défaut 200 transients) : seuil des
+    cellules hyperactives = max(durée du repos x seuil_hz, min). Avec
+    CASCADE, 0,2 Hz et 200 retirent jusqu'à 2/3 des cellules ; 0,5 Hz sans
+    minimum retire 1 à 13 % des cellules (environ le 95e percentile).
+
 ## 2026.11.20c (20 nov.)
 - Détection `cascade_discrets`, nouvelle option
   `config.pre.cascade_reechantillonnage_Hz` (défaut : absente, rien ne

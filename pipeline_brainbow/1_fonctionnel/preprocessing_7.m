@@ -12,7 +12,9 @@ function [Tr1b,speedsm,Raster,SumAct,MAct,Race,RasterRace,WinRest,WinActive,TRac
 %    épisodes de repos seulement
 %  - SCE_detection5 : seuil sans plafond, SCE attendus par hasard
 %  - Acttmp2 / PromALL / WidthALL mis à jour quand des trames sont mises à 0
-%  - opts.retirer_hyperactives (false par défaut = comme avant)
+%  - opts.retirer_hyperactives (false par défaut = comme avant) ; seuil
+%    réglable (21 nov.) : opts.hyperactives_seuil_hz (défaut 0,2) et
+%    opts.hyperactives_min (défaut 200 transients)
 %  - opts.retirer_tailles (7 nov.) : ROI trop petites ou trop grandes
 %    (tailles_roi) : raster mis à zéro
 %  - opts.retirer_doublons (7 nov.) : ROI qui sont la même cellule comptée
@@ -129,7 +131,16 @@ end
 %% CELLULES HYPERACTIVES
 transients_percell = cellfun(@length, Acttmp2);
 seuil_frequence = 0.2;    % 1 pic toutes les 5 s
-max_peak = max(length(WinRest) / sampling_rate * seuil_frequence, 200);
+min_hyper = 200;          % jamais moins de 200 transients
+% 21 nov. (demandé par l'utilisateur) : seuil réglable, pour CASCADE (où
+% 0,2 Hz retire jusqu'à 2/3 des cellules) ; défauts = comme avant
+if isfield(opts, 'hyperactives_seuil_hz') && ~isempty(opts.hyperactives_seuil_hz)
+    seuil_frequence = opts.hyperactives_seuil_hz;
+end
+if isfield(opts, 'hyperactives_min') && ~isempty(opts.hyperactives_min)
+    min_hyper = opts.hyperactives_min;
+end
+max_peak = max(length(WinRest) / sampling_rate * seuil_frequence, min_hyper);
 cellules_hyperactives_idx = find(transients_percell > max_peak);
 if isfield(opts, 'retirer_hyperactives') && opts.retirer_hyperactives && ~isempty(cellules_hyperactives_idx)
     Raster(cellules_hyperactives_idx, :) = 0;

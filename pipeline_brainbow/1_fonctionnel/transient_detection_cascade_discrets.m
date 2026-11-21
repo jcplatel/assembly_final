@@ -15,7 +15,8 @@ function [Raster, Acttmp2, th_detection, PromALL, WidthALL, info] = ...
 %  PA ; PromALL{i} = nombre de PA à ces images ; WidthALL{i} = 1 ;
 %  th_detection = NaN (pas de seuil).
 %  opts : cascade_modele, cascade_processus (défaut 24), cascade_graine (1),
-%         cascade_reechantillonnage_Hz (défaut [] : aucun).
+%         cascade_reechantillonnage_Hz (défaut [] : aucun),
+%         cascade_min_pa (défaut 1 : image comptée avec >= 1 PA ; 2 : >= 2 PA).
 %  20 nov. (demandé par l'utilisateur) : cascade_reechantillonnage_Hz = 15
 %  pour un modèle entraîné à 15 Hz (ex. GC8m_EXC_15Hz_smoothing50ms_high_noise) :
 %  DFF0 interpolé (linéaire) sur une grille à 15 Hz, CASCADE et PA discrets à
@@ -82,7 +83,11 @@ end
 
 [NCell, Nz] = size(n_pa);
 repos = false(1, Nz); repos(WinRest) = true;
-Raster = double(n_pa > 0) .* repos;
+% 21 nov. (demandé par l'utilisateur) : opts.cascade_min_pa = nombre minimal
+% de PA dans l'image pour compter un événement (défaut 1 = comme avant)
+min_pa = 1;
+if isfield(opts, 'cascade_min_pa') && ~isempty(opts.cascade_min_pa), min_pa = opts.cascade_min_pa; end
+Raster = double(n_pa >= min_pa & n_pa > 0) .* repos;
 Acttmp2 = cell(1, NCell); PromALL = cell(1, NCell); WidthALL = cell(1, NCell);
 for i = 1:NCell
     l = find(Raster(i, :));
