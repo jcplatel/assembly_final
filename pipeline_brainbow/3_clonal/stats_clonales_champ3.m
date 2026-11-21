@@ -54,6 +54,15 @@ nPerm          = opts_clonal.nPerm;
 seuilstat      = opts_clonal.seuilstat;
 nmin_couleur   = opts_clonal.nmin_couleur;
 nmin_assemblee = opts_clonal.nmin_assemblee;
+% 21 nov. (demandé par l'utilisateur) : champs absents = ancien calcul
+%  midp   : p_minp « mid-p » (Lancaster) : permutations ex aequo avec
+%           l'observé comptées à moitié : (n_< + 0,5 (n_= + 1)) / (nPerm + 1) ;
+%           taux_nul et p_min_atteignable calculés de la même façon
+%  tarone : pour chaque assemblée, seules les couleurs qui PEUVENT donner
+%           p < seuilstat (toutes ses cellules colorées de cette couleur)
+%           entrent dans le min-p ; choisi sans regarder les comptes observés
+midp   = isfield(opts_clonal, 'midp') && opts_clonal.midp;
+tarone = isfield(opts_clonal, 'tarone') && opts_clonal.tarone;
 
 nom_couleur = {'R', 'G', 'B', 'RG', 'RB', 'GB'};
 nC = 6;
@@ -129,9 +138,19 @@ if ~strcmp(mode_permutation, 'territoire')
         end
     end
     base = reshape(1:nA*nC, nA, nC);             % indice linéaire de (a, c, k) = base + k*nA*nC
+    p_brut = Ptab(base + Obs*nA*nC);             % p hypergéo de chaque couleur (non corrigée, avant Tarone)
+    if tarone
+        % couleur exclue pour cette assemblée si même le cas le plus favorable
+        % ne donne pas p < seuilstat (ne dépend que de n_col et de Kcol)
+        m_max0 = min(repmat(n_col, 1, nC), repmat(Kcol, nA, 1));
+        exclue_tarone = Ptab(base + m_max0*nA*nC) >= seuilstat;
+        [ia, ic] = find(exclue_tarone);
+        for j = 1:numel(ia)
+            Ptab(ia(j), ic(j), :) = 1;           % ne gagne jamais le min
+        end
+    end
 
-    p_brut = Ptab(base + Obs*nA*nC);             % p hypergéo de chaque couleur (non corrigée)
-    T_obs  = min(p_brut, [], 2);                 % la couleur la plus surprenante
+    T_obs  = min(Ptab(base + Obs*nA*nC), [], 2);    % la couleur la plus surprenante (couleurs gardées)
 
     m_max = min(repmat(n_col, 1, nC), repmat(Kcol, nA, 1));
     T_min = min(Ptab(base + m_max*nA*nC), [], 2);    % cas le plus favorable
@@ -176,8 +195,15 @@ if ~strcmp(mode_permutation, 'territoire')
 
     %% ---------- 6. p-values ---------------------------------------------------
     tol = 1e-10;
-    p_minp            = (1 + sum(T_perm    <= T_obs * (1 + tol), 2)) / (nPerm + 1);
-    p_min_atteignable = (1 + sum(T_perm    <= T_min * (1 + tol), 2)) / (nPerm + 1);
+    if midp
+        n_lt = sum(T_perm < T_obs * (1 - tol), 2); n_le = sum(T_perm <= T_obs * (1 + tol), 2);
+        p_minp = (n_lt + 0.5 * (n_le - n_lt + 1)) / (nPerm + 1);
+        n_lt = sum(T_perm < T_min * (1 - tol), 2); n_le = sum(T_perm <= T_min * (1 + tol), 2);
+        p_min_atteignable = (n_lt + 0.5 * (n_le - n_lt + 1)) / (nPerm + 1);
+    else
+        p_minp            = (1 + sum(T_perm    <= T_obs * (1 + tol), 2)) / (nPerm + 1);
+        p_min_atteignable = (1 + sum(T_perm    <= T_min * (1 + tol), 2)) / (nPerm + 1);
+    end
     p_chi2            = (1 + sum(chi2_perm >= chi2_obs * (1 - tol), 2)) / (nPerm + 1);
     testable = n_col >= nmin_assemblee & p_min_atteignable < seuilstat;
 
@@ -199,9 +225,10 @@ if ~strcmp(mode_permutation, 'territoire')
         cnt = accumarray(rang, 1);
         n_inf_egal = cumsum(cnt);                        % nb de permutations <= chaque valeur
         p_perm = n_inf_egal(rang) / nPerm;               % p_minp qu'aurait eue chaque permutation
+        p_mid_perm = (n_inf_egal(rang) - 0.5 * cnt(rang)) / nPerm;
+        if midp, p_perm = p_mid_perm; end                % même règle que p_minp
         taux_nul(a) = mean(p_perm < seuilstat);
         p0_sup(a)   = mean(p_perm > 0.5);
-        p_mid_perm = (n_inf_egal(rang) - 0.5 * cnt(rang)) / nPerm;
         n_lt = sum(T_perm(a, :) < T_obs(a) * (1 - tol));
         n_le = sum(T_perm(a, :) <= T_obs(a) * (1 + tol));
         p_mid_obs = (n_lt + 0.5 * (n_le - n_lt)) / nPerm;
@@ -225,7 +252,7 @@ else
     % cette urne seulement. Question : l'assemblée a-t-elle plus d'une couleur
     % que les cellules qui occupent la même surface ? (voir minp_territoire)
     TT = minp_territoire(colorcell, assembly, gcamp_centroid, est_coloree, D.marge_territoire_px, ...
-        nPerm, seuilstat, nmin_couleur, graine);
+        nPerm, seuilstat, nmin_couleur, graine, midp, tarone);
     tol = 1e-10; %#ok<NASGU>
     p_minp = TT.p_minp; p_min_atteignable = TT.p_min_atteignable; p_chi2 = TT.p_chi2;
     taux_nul = TT.taux_nul; score_minp = TT.score_minp; p0_sup = TT.p0_sup;
@@ -357,7 +384,7 @@ end
 
 
 %% =========================================================================
-function T = minp_territoire(colorcell, assembly, xy, est_coloree, marge_px, nPerm, seuilstat, nmin_couleur, graine)
+function T = minp_territoire(colorcell, assembly, xy, est_coloree, marge_px, nPerm, seuilstat, nmin_couleur, graine, midp, tarone)
 % p_minp de chaque assemblée contre les cellules colorées de SA surface.
 % Même statistique que le test principal (couleur la plus surprenante,
 % hypergéométrique), mais la référence est la composition de la surface et
@@ -396,8 +423,13 @@ for a = 1:nA
     pb = Pt(sub2ind(size(Pt), 1:nC, obs + 1));
     pb(~valide) = NaN;
     T.p_brut(a, :) = pb;
-    Tobs = min(pb(valide));
     mmax = min(n, K);
+    if tarone                                % couleurs qui ne peuvent pas donner p < seuilstat
+        for c = find(valide)
+            if Pt(c, mmax(c) + 1) >= seuilstat, Pt(c, :) = 1; end
+        end
+    end
+    Tobs = min(Pt(sub2ind(size(Pt), find(valide), obs(valide) + 1)));
     Tmin = min(Pt(sub2ind(size(Pt), find(valide), mmax(valide) + 1)));
     E = n * K / N; E(~valide) = NaN;
     chi2obs = sum((obs - E).^2 ./ E, 'omitnan');
@@ -411,17 +443,23 @@ for a = 1:nA
     V(:, ~valide) = Inf;
     Tp = min(V, [], 2)';
     chi2p = sum((cnt - E).^2 ./ E, 2, 'omitnan')';
-    T.p_minp(a)            = (1 + sum(Tp <= Tobs * (1 + tol))) / (nPerm + 1);
-    T.p_min_atteignable(a) = (1 + sum(Tp <= Tmin * (1 + tol))) / (nPerm + 1);
+    if midp
+        T.p_minp(a) = (sum(Tp < Tobs * (1 - tol)) + 0.5 * (sum(abs(Tp - Tobs) <= Tobs * tol) + 1)) / (nPerm + 1);
+        T.p_min_atteignable(a) = (sum(Tp < Tmin * (1 - tol)) + 0.5 * (sum(abs(Tp - Tmin) <= Tmin * tol) + 1)) / (nPerm + 1);
+    else
+        T.p_minp(a)            = (1 + sum(Tp <= Tobs * (1 + tol))) / (nPerm + 1);
+        T.p_min_atteignable(a) = (1 + sum(Tp <= Tmin * (1 + tol))) / (nPerm + 1);
+    end
     T.p_chi2(a)            = (1 + sum(chi2p >= chi2obs * (1 - tol))) / (nPerm + 1);
     [~, ~, rang] = unique(Tp);
     rang = rang(:);
     nb = accumarray(rang, 1);
     n_inf_egal = cumsum(nb);
     p_perm = n_inf_egal(rang) / nPerm;
+    p_mid_perm = (n_inf_egal(rang) - 0.5 * nb(rang)) / nPerm;
+    if midp, p_perm = p_mid_perm; end
     T.taux_nul(a) = mean(p_perm < seuilstat);
     T.p0_sup(a)   = mean(p_perm > 0.5);
-    p_mid_perm = (n_inf_egal(rang) - 0.5 * nb(rang)) / nPerm;
     n_lt = sum(Tp < Tobs * (1 - tol));
     n_le = sum(Tp <= Tobs * (1 + tol));
     z0 = -norminv(min(max(p_mid_perm, bornes_p(1)), bornes_p(2)));

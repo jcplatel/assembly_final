@@ -169,6 +169,15 @@ config.clonal.nPerm          = 10000;
 config.clonal.seuilstat      = 0.05;   % sert aussi de seuil (alpha) à l'agrégation
 config.clonal.nmin_couleur   = 4;
 config.clonal.nmin_assemblee = 3;
+% 21 nov. (demandé par l'utilisateur, après le screening CASCADE) : mid-p et
+% Tarone par défaut ; avant : absents (= false, ancien calcul)
+%  midp   : permutations ex aequo avec l'observé comptées à moitié dans
+%           p_minp ; p_min_atteignable et taux_nul suivent la même règle
+%  tarone : pour chaque assemblée, une couleur qui ne pourrait jamais
+%           atteindre p < seuilstat (même avec toutes ses cellules) est
+%           retirée du minimum (elle ne coûte plus rien à la correction)
+config.clonal.midp           = true;
+config.clonal.tarone         = true;
 % Variantes {référence, permutation}. La PREMIÈRE ligne est le test principal.
 % ('assemblees','globale' retiré le 30 oct. : il ne répond pas à la question posée)
 % (3 nov.) contrôle spatial = même référence que le principal, seule la

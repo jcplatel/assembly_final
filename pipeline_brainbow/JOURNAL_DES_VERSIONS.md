@@ -6,6 +6,22 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.21b (21 nov.)
+- **mid-p et Tarone par défaut** dans le test de l'étape 3
+  (`stats_clonales_champ3`), demandés par l'utilisateur après le screening
+  CASCADE : `config.clonal.midp = true`, `config.clonal.tarone = true`
+  (avant : absents = ancien calcul ; mettre `false` pour le retrouver).
+  - mid-p : permutations ex aequo avec l'observé comptées à moitié,
+    p = (n_< + 0,5 (n_= + 1)) / (nPerm + 1) ; `p_min_atteignable`,
+    `taux_nul` et `p0_sup` suivent la même règle (sinon l'excès est gonflé).
+  - Tarone : pour chaque assemblée, une couleur dont le meilleur p possible
+    (toutes ses cellules dans l'assemblée) est >= seuilstat est retirée du
+    minimum. Aussi dans la variante 'territoire'.
+  - Vérifié sur selection34 (analyse `selection34_midp_tarone_v2`) :
+    6 / 32 assemblées à p_minp < 0,05 (attendu 4,5 %), 4 après FDR.
+  - Pas encore dans le screening (`screening\table_minp.m`,
+    `screening_agregation.m`) : il garde l'ancien calcul.
+
 ## 2026.11.21a (21 nov.)
 - Deux nouvelles options du prétraitement, pour le screening des réglages
   CASCADE. Sans ces champs dans `config.pre`, rien ne change (défauts = comme
