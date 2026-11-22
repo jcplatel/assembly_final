@@ -779,11 +779,36 @@ rafraichir_table();
         ef_dossier.Value = dossier;
         ef_dossier.Tooltip = dossier;
         remplir_analyses(nom);
+        % 22 nov. (« quand je choisis une analyse ça ne la charge pas ») : la
+        % session affichée est rechargée dans la nouvelle analyse (la même si
+        % elle y est, sinon la première) ; avant, la partie droite restait
+        % celle de l'analyse précédente
+        ancienne = '';
+        if ~isempty(selection) && ~isempty(sessions) && selection(end) <= height(sessions)
+            ancienne = sessions.nom{selection(end)};
+        end
         selection = [];
+        cache_act = containers.Map('KeyType', 'char', 'ValueType', 'any');
+        cache_p = containers.Map('KeyType', 'char', 'ValueType', 'any');
         rafraichir_table();
         journal(sprintf('Analysis %s: step 1 %s | %s', code_analyse(dossier_analyse()), dossier, texte_analyse()));
         reglage_de_l_analyse();
         memoriser_choix();
+        if isempty(sessions) || height(sessions) == 0
+            vider_axes();
+            txt_info.Value = {'No session in this analysis.'};
+            return
+        end
+        s = find(strcmp(sessions.nom, ancienne), 1);
+        if isempty(s), s = 1; end
+        selection = s;
+        try, tab.Selection = s; catch, end
+        try
+            remplir_K(s);
+        catch err
+            journal(sprintf('K list of %s: %s', sessions.nom{s}, err.message));
+        end
+        afficher();
     end
 
     function ouvrir_registre()
@@ -808,7 +833,7 @@ rafraichir_table();
         T2 = table();
         ligne_choisie = [];
         t2.CellSelectionCallback = @(~, e) noter(e);
-        try, t2.DoubleClickedFcn = @(~, ~) choisir(); catch, end
+        try, t2.DoubleClickedFcn = @(~, e) double_clic(e); catch, end
         drawnow;
         remplir('');
 
@@ -847,6 +872,16 @@ rafraichir_table();
             ligne_choisie = [];
         end
 
+        function double_clic(e)
+            % ligne double-cliquée (sans attendre la sélection)
+            try
+                r = e.InteractionInformation.DisplayRow;
+                if ~isempty(r), noter(struct('Indices', [r 1])); end
+            catch
+            end
+            choisir();
+        end
+
         function noter(e)
             ligne_choisie = [];
             if isempty(e.Indices), return; end
@@ -866,6 +901,9 @@ rafraichir_table();
         end
 
         function choisir()
+            if isempty(ligne_choisie) && ~isempty(t2.Selection)     % ligne surlignée
+                noter(struct('Indices', [t2.Selection(end, 1) 1]));
+            end
             if isempty(ligne_choisie) || ligne_choisie > height(T2)
                 uialert(f2, 'Select an analysis in the table first.', 'Analyses');
                 return

@@ -6,6 +6,14 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.22b (22 nov.)
+- Interface, tableau des analyses (« quand je choisis une analyse ça ne la
+  charge pas ») : après « Choose » (ou double-clic), la session affichée à
+  droite est rechargée dans la nouvelle analyse (la même session si elle y
+  est, sinon la première) ; avant, la partie droite restait celle de
+  l'analyse précédente tant qu'on ne recliquait pas sur une session.
+  « Choose » prend aussi la ligne surlignée, et le double-clic sa propre ligne.
+
 ## 2026.11.22a (22 nov.)
 - **Tableau des analyses** (demandé par l'utilisateur : « les noms des
   analyses deviennent incompréhensibles ») : `utilitairesegistre_analyses.m`
