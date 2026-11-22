@@ -6,6 +6,30 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.22d (22 nov.)
+- Étape 4, demandé par l'utilisateur (« fais un code pour quantifier ça et une
+  figure au moment de l'agrégation ») : `4_agregation/profil_assemblees.m`,
+  appelé par agregation_stats_clonales3 après les variantes ; sorties dans
+  `agregation\profil_assemblees\` et deux lignes dans le résumé.
+  1. **Profil des assemblées biaisées** (exploratoire) : assemblées testables
+     du test principal, biaisées (p_minp < seuilstat) contre les autres, sur
+     des caractéristiques sans couleur (taille, compacité, étalement,
+     activations, SCE de la session, membres actifs par activation, % du
+     champ, cellules du champ, K où l'assemblée est vue et co-appartenance du
+     consensus, fréquence des membres au repos, part de gros événements, plan)
+     + cellules colorées (puissance). Wilcoxon rang-somme, seuil de
+     Bonferroni indiqué. `profil_assemblees_biaisees.csv`,
+     `profil_assemblees_detail.csv`, `biased_assembly_profile.png`.
+  2. **Taille des événements** (CASCADE en PA discrets seulement) :
+     événement = images consécutives avec PA, au repos ; petit (type ripple)
+     = <= 3 PA et <= 300 ms. Distribution pour tous les événements et pour
+     les participations aux SCE, et part de gros par animal. PA comme à
+     l'étape 1 (images mauvaises et gros événements filtrés exclus).
+     `taille_evenements_par_session.csv`, `event_size.png`.
+  Vérifié sur resultats_cascade75_mpd6 : mêmes chiffres que les scripts
+  séparés du 22 nov. (92,8 % de petits événements ; 87,3 % des participations
+  aux SCE ; aucune caractéristique ne distingue les biaisées, p >= 0,14).
+
 ## 2026.11.22c (22 nov.)
 - Détection CASCADE (PA discrets), demandé par l'utilisateur : option pour
   **retirer les gros événements** (une cellule tire 0 à 2 PA par ripple ;

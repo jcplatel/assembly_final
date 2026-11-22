@@ -152,6 +152,17 @@ for v = 1:numel(noms_variantes)
     bilans{v} = analyser_variante(R, config, fullfile(dossier_agreg, [noms_variantes{v} suffixe]), nom_affiche);
 end
 
+% (22 nov., demandé par l'utilisateur) profil des assemblées biaisées et
+% taille des événements CASCADE -> agregation\profil_assemblees\
+lignes_profil = {};
+try
+    lignes_profil = profil_assemblees(fullfile(dossier_agreg, [noms_variantes{1} suffixe], ...
+        'resultats_biais_clonal.csv'), sessions(est_ok, :), config, dossier_agreg);
+catch err
+    lignes_profil = {sprintf('Profil des assemblées non fait : %s', err.message)};
+    warning('profil_assemblees : %s', err.message);
+end
+
 % Réglages de cette étape 4 (bouton « Analysis parameters » de l'interface)
 agreg = config.agreg;
 agreg.seuilstat = config.clonal.seuilstat;
@@ -163,6 +174,9 @@ lignes_etape1 = verifier_etape1(sessions(est_ok, :));
 fichier_resume = fullfile(dossier_agreg, ['resume_resultats' suffixe '.txt']);
 if ~isempty(lignes_compacite)
     lignes_controles = [lignes_controles(:)', lignes_compacite(:)'];
+end
+if ~isempty(lignes_profil)
+    lignes_controles = [lignes_controles(:)', lignes_profil(:)'];
 end
 lignes_resume = ecrire_resume(bilans, noms_variantes, config, fichier_resume, lignes_etape1, ...
     lignes_controles);
