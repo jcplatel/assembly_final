@@ -6,6 +6,21 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.22c (22 nov.)
+- Détection CASCADE (PA discrets), demandé par l'utilisateur : option pour
+  **retirer les gros événements** (une cellule tire 0 à 2 PA par ripple ;
+  une bouffée riche en PA ou longue n'est probablement pas liée à un ripple).
+  Événement = suite d'images consécutives avec >= 1 PA (session entière),
+  retiré en entier si son nombre de PA dépasse `opts.cascade_max_pa_evenement`
+  ou si sa durée dépasse `opts.cascade_max_duree_evenement_s` (en images :
+  round(durée x fréquence) ; 0,3 s = 3 images, 0,2 s = 2 images).
+  Champs facultatifs (absents = rien n'est retiré, comme avant) ; ils ne sont
+  pas dans config_brainbow.m, donc les étapes 1 déjà faites restent valables.
+  Nombre d'événements et de PA retirés affiché et gardé dans
+  `pretraitement.mat` (`diagnostic.bouffees.gros_evenements`).
+  Vérifié sur 443669_220614_plane0 : sans option, même Raster qu'avant ;
+  3 PA / 0,3 s : 9 % des événements et 40 % des PA retirés.
+
 ## 2026.11.22b (22 nov.)
 - Interface, tableau des analyses (« quand je choisis une analyse ça ne la
   charge pas ») : après « Choose » (ou double-clic), la session affichée à
@@ -16,12 +31,14 @@ toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
 ## 2026.11.22a (22 nov.)
 - **Tableau des analyses** (demandé par l'utilisateur : « les noms des
-  analyses deviennent incompréhensibles ») : `utilitairesegistre_analyses.m`
+  analyses deviennent incompréhensibles ») : `utilitaires
+egistre_analyses.m`
   inventorie toutes les analyses de `...ssembly
 ocues` et `...\cues`
   (principale et `analyses\<nom>` de chaque dossier d'étape 1) et donne à
   chacune un **code stable** (A001, A002... ; gardé dans
-  `...ssemblyegistre_analyses.mat`, jamais renuméroté ; tableau aussi
+  `...ssembly
+egistre_analyses.mat`, jamais renuméroté ; tableau aussi
   dans `registre_analyses.csv`). Colonnes : code, condition, date, dossier
   d'étape 1, analyse, version (v1/v2), réglages résumés, sessions faites à
   chaque étape, sessions ok, fin du dernier lancement (fini / erreurs /

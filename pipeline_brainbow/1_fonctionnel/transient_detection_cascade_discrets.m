@@ -17,6 +17,8 @@ function [Raster, Acttmp2, th_detection, PromALL, WidthALL, info] = ...
 %  opts : cascade_modele, cascade_processus (défaut 24), cascade_graine (1),
 %         cascade_reechantillonnage_Hz (défaut [] : aucun),
 %         cascade_min_pa (défaut 1 : image comptée avec >= 1 PA ; 2 : >= 2 PA).
+%         cascade_max_pa_evenement, cascade_max_duree_evenement_s (22 nov. ;
+%         défaut Inf) : gros événements retirés (voir plus bas).
 %  20 nov. (demandé par l'utilisateur) : cascade_reechantillonnage_Hz = 15
 %  pour un modèle entraîné à 15 Hz (ex. GC8m_EXC_15Hz_smoothing50ms_high_noise) :
 %  DFF0 interpolé (linéaire) sur une grille à 15 Hz, CASCADE et PA discrets à
@@ -87,6 +89,42 @@ repos = false(1, Nz); repos(WinRest) = true;
 % de PA dans l'image pour compter un événement (défaut 1 = comme avant)
 min_pa = 1;
 if isfield(opts, 'cascade_min_pa') && ~isempty(opts.cascade_min_pa), min_pa = opts.cascade_min_pa; end
+% 22 nov. (demandé par l'utilisateur) : retirer les GROS événements (une
+% cellule tire 0 à 2 PA par ripple ; une bouffée longue ou riche en PA n'est
+% probablement pas liée à un ripple). Événement = suite d'images consécutives
+% avec >= 1 PA (session entière). Il est retiré en entier si :
+%   opts.cascade_max_pa_evenement      : nombre total de PA > cette valeur
+%   opts.cascade_max_duree_evenement_s : durée > cette valeur (en images :
+%                                        round(durée x fréquence), ex. 0,3 s -> 3 images)
+% Absents ou Inf = rien n'est retiré (comme avant). Champs facultatifs, pas
+% dans config_brainbow.m : les étapes 1 déjà faites restent valables.
+max_pa = Inf; max_images = Inf;
+if isfield(opts, 'cascade_max_pa_evenement') && ~isempty(opts.cascade_max_pa_evenement)
+    max_pa = opts.cascade_max_pa_evenement;
+end
+if isfield(opts, 'cascade_max_duree_evenement_s') && ~isempty(opts.cascade_max_duree_evenement_s)
+    max_images = round(opts.cascade_max_duree_evenement_s * sampling_rate);
+end
+info_gros = struct('n_evenements', 0, 'n_retires', 0, 'PA_retires', 0, 'max_pa', max_pa, 'max_images', max_images);
+if isfinite(max_pa) || isfinite(max_images)
+    d = diff([false(NCell, 1), n_pa > 0, false(NCell, 1)], 1, 2);
+    [debut, ci] = find(d' == 1);          % ordre : cellule puis temps (débuts et fins)
+    [fin, ~] = find(d' == -1);
+    fin = fin - 1;
+    cs = cumsum([zeros(NCell, 1), n_pa], 2);
+    taille = cs(sub2ind(size(cs), ci, fin + 1)) - cs(sub2ind(size(cs), ci, debut));
+    duree = fin - debut + 1;
+    gros = find(taille > max_pa | duree > max_images);
+    info_gros.n_evenements = numel(debut);
+    info_gros.n_retires = numel(gros);
+    info_gros.PA_retires = sum(taille(gros));
+    for e = gros(:)'
+        n_pa(ci(e), debut(e):fin(e)) = 0;
+    end
+    fprintf('Gros événements retirés : %d / %d (%.1f %%), %.1f %% des PA (max %g PA, %g images)\n', ...
+        numel(gros), numel(debut), 100 * numel(gros) / max(1, numel(debut)), ...
+        100 * info_gros.PA_retires / max(1, sum(taille)), max_pa, max_images);
+end
 Raster = double(n_pa >= min_pa & n_pa > 0) .* repos;
 Acttmp2 = cell(1, NCell); PromALL = cell(1, NCell); WidthALL = cell(1, NCell);
 for i = 1:NCell
@@ -97,7 +135,7 @@ th_detection = nan(1, NCell);
 min_repos = numel(WinRest) / sampling_rate / 60;
 info = struct('modele', modele, 'graine', graine, 'reechantillonnage_Hz', hz, ...
     'PA_par_min_repos', sum(n_pa(:, repos), 2) / max(eps, min_repos), ...
-    'images_PA_par_min_repos', sum(Raster, 2) / max(eps, min_repos));
+    'images_PA_par_min_repos', sum(Raster, 2) / max(eps, min_repos), 'gros_evenements', info_gros);
 end
 
 
