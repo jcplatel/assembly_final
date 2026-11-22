@@ -6,6 +6,34 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.22a (22 nov.)
+- **Tableau des analyses** (demandé par l'utilisateur : « les noms des
+  analyses deviennent incompréhensibles ») : `utilitairesegistre_analyses.m`
+  inventorie toutes les analyses de `...ssembly
+ocues` et `...\cues`
+  (principale et `analyses\<nom>` de chaque dossier d'étape 1) et donne à
+  chacune un **code stable** (A001, A002... ; gardé dans
+  `...ssemblyegistre_analyses.mat`, jamais renuméroté ; tableau aussi
+  dans `registre_analyses.csv`). Colonnes : code, condition, date, dossier
+  d'étape 1, analyse, version (v1/v2), réglages résumés, sessions faites à
+  chaque étape, sessions ok, fin du dernier lancement (fini / erreurs /
+  arrêté), SCE (total), assemblées, testables, % p < 0,05 (non corrigée),
+  % p_minp < 0,05, nombre à q < 0,05 et q < 0,10 (test champ / globale).
+  Cache : seules les analyses dont les fichiers ont changé sont relues.
+- Interface : bouton **« Analyses table... »** (fenêtre avec ce tableau,
+  triable ; « Choose » ou double-clic affiche l'analyse) ; le code est devant
+  le nom dans le menu « Analysis » et dans le titre de la fenêtre ;
+  l'analyse affichée est **gardée pour la prochaine ouverture** (setpref
+  'brainbow_interface').
+- Interface, correction : la version des assemblées suit l'analyse choisie.
+  Avant, avec `version_assemblees = 'v2'` dans config_brainbow, une analyse
+  v1 (principale, ou nom sans v2) était cherchée dans `analyses2` ou
+  `<nom>_v2` : « K choice not done », couleurs cachées (ex.
+  `resultats_cascade75_mpd6`). Maintenant : nom en v2 -> v2 ; autre nom -> v1 ;
+  principale -> v1 si elle a déjà ses étapes 2-4, sinon la version de
+  config_brainbow (lancement comme avant). « New... » ajoute `_v2` au nom
+  quand config_brainbow est en v2 (même dossier que celui où le pipeline écrit).
+
 ## 2026.11.21b (21 nov.)
 - **mid-p et Tarone par défaut** dans le test de l'étape 3
   (`stats_clonales_champ3`), demandés par l'utilisateur après le screening

@@ -21,6 +21,9 @@ function interface_brainbow()
 %   each K (one subfolder per session) and the main analysis (steps 2-4).
 %   "Analysis" chooses where steps 2-4 are written and read: main, or
 %   <step 1 folder>\analyses\<name> ("New..."), on the same step 1.
+%   "Analyses table..." (22 nov.): every analysis of ...\nocues and ...\cues
+%   with a code (A001...), its settings and results (registre_analyses);
+%   choose one there. The analysis shown is restored at the next opening.
 %
 %   The menu next to "Overall setting" chooses the condition shown: no cues
 %   (sans_indice) or cues (avec_indice); the step 1 folder follows
@@ -223,8 +226,14 @@ b_figs = uibutton(gb, 'Text', 'Results figures', 'ButtonPushedFcn', @(~, ~) voir
 b_figs.Layout.Row = 5; b_figs.Layout.Column = 2;
 b_param = uibutton(gb, 'Text', 'Analysis parameters', 'ButtonPushedFcn', @(~, ~) voir_parametres(), ...
     'Tooltip', 'All the parameters of this analysis, steps 1 to 4, read in the result files');
-b_param.Layout.Row = 6; b_param.Layout.Column = [1 2];
-boutons = [b_tout, b_sel, b_ajout, b_excel, b_doss, b_rafr, b_diagk, b_resume, b_figs, b_param];
+b_param.Layout.Row = 6; b_param.Layout.Column = 1;
+% 22 nov. (demandé par l'utilisateur) : tableau de toutes les analyses, avec
+% un code, leurs réglages et leurs résultats ; on y choisit l'analyse
+b_registre = uibutton(gb, 'Text', 'Analyses table...', 'ButtonPushedFcn', @(~, ~) ouvrir_registre(), ...
+    'Tooltip', sprintf(['All the analyses (no cues and cues) with a code, their date, settings,\n' ...
+    'steps done, sessions, SCEs, assemblies and clonal bias. Choose one to display it.']));
+b_registre.Layout.Row = 6; b_registre.Layout.Column = 2;
+boutons = [b_tout, b_sel, b_ajout, b_excel, b_doss, b_rafr, b_diagk, b_resume, b_figs, b_param, b_registre];
 
 % Progress
 p_prog = uipanel(gauche, 'Title', 'Progress');
@@ -329,6 +338,7 @@ ax_K.Layout.Row = [1 6]; ax_K.Layout.Column = 4;
 afficher_regle_sce();
 vider_axes();
 remplir_analyses('');
+restaurer_choix();          % 22 nov. : dernière analyse choisie (session précédente)
 verifier_fichiers();
 journal('Interface ready. Select a session in the table to display it.');
 rafraichir_table();
@@ -645,6 +655,18 @@ rafraichir_table();
         cfg.conditions = {condition_courante};     % condition chosen in the interface (19 nov.)
         cfg.PathSave = dossier_resultats;
         cfg.analyse = nom_analyse;
+        % 22 nov. : la version des assemblées suit l'analyse choisie (sinon,
+        % avec version_assemblees = 'v2' dans config_brainbow, une analyse
+        % v1 était cherchée dans <nom>_v2 ou analyses\v2 : « K choice not
+        % done », couleurs cachées). Nom en v2 (v2, v2_..., ..._v2) : v2 ;
+        % autre nom : v1 ; principale : v1 si elle a déjà ses étapes 2-4,
+        % sinon la version de config_brainbow (lancement : comme avant).
+        if ~isempty(nom_analyse)
+            if est_v2(fullfile(dossier_resultats, 'analyses', nom_analyse)), cfg.version_assemblees = 'v2';
+            else, cfg.version_assemblees = 'v1'; end
+        elseif isfile(fullfile(dossier_resultats, 'best_k_par_session.mat'))
+            cfg.version_assemblees = 'v1';
+        end
         if isfield(cfg, 'PathSource'), cfg = rmfield(cfg, 'PathSource'); end
         if isfield(cfg, 'PathEtape1'), cfg = rmfield(cfg, 'PathEtape1'); end
         cfg = dossiers_analyse(cfg);    % PathEtape1 = step 1, PathSave = steps 2-4
@@ -685,11 +707,187 @@ rafraichir_table();
         noms_analyses = sort(noms(~ismember(noms, {'.', '..'})));
         i = find(strcmp(noms_analyses, nom_voulu), 1);
         if isempty(i), i = 0; end
-        set(dd_ana, 'Items', [{'main (in the step 1 folder)'}, noms_analyses], ...
-            'ItemsData', 0:numel(noms_analyses));
+        % 22 nov. : code de l'analyse (tableau des analyses) devant son nom
+        textes = [{'main (in the step 1 folder)'}, noms_analyses];
+        chemins = [{dossier_resultats}, cellfun(@(n) fullfile(dossier_resultats, 'analyses', n), ...
+            noms_analyses, 'UniformOutput', false)];
+        C = table();
+        try, C = registre_analyses(racine_analyses(), 'codes'); catch, end
+        for k = 1:numel(textes)
+            if isempty(C), break; end
+            j = find(strcmpi(C.chemin, chemins{k}), 1);
+            if ~isempty(j), textes{k} = [C.code{j} '  ' textes{k}]; end
+        end
+        set(dd_ana, 'Items', textes, 'ItemsData', 0:numel(noms_analyses));
         dd_ana.Value = i;
         if i == 0, nom_analyse = ''; else, nom_analyse = noms_analyses{i}; end
         dd_ana.Tooltip = dossier_analyse();
+        mettre_titre();
+    end
+
+    function c = code_analyse(chemin)
+        % code A001... du tableau des analyses ('' si pas encore inventoriée)
+        c = '';
+        try
+            C = registre_analyses(racine_analyses(), 'codes');
+            i = find(strcmpi(C.chemin, chemin), 1);
+            if ~isempty(i), c = C.code{i}; end
+        catch
+        end
+    end
+
+    function r = racine_analyses()
+        % dossier qui contient nocues\ et cues\ (celui de config_brainbow)
+        r = fileparts(fileparts(config0.PathSave));
+    end
+
+    function mettre_titre()
+        c = code_analyse(dossier_analyse());
+        t = 'Brainbow: assemblies and clonal analysis';
+        if ~isempty(c), t = sprintf('%s  [%s]', t, c); end
+        fig.Name = t;
+    end
+
+    function memoriser_choix()
+        % 22 nov. : l'analyse choisie est gardée pour la prochaine ouverture
+        try
+            setpref('brainbow_interface', 'derniere_analyse', struct('condition', condition_courante, ...
+                'dossier', dossier_resultats, 'analyse', nom_analyse));
+        catch
+        end
+    end
+
+    function restaurer_choix()
+        % au démarrage : dernière analyse choisie, si son dossier existe encore
+        if ~ispref('brainbow_interface', 'derniere_analyse'), return; end
+        try
+            ch = getpref('brainbow_interface', 'derniere_analyse');
+            if ~isfolder(ch.dossier), return; end
+            aller_a(ch.condition, ch.dossier, ch.analyse);
+        catch err
+            journal(['Last analysis not restored: ' err.message]);
+        end
+    end
+
+    function aller_a(condition, dossier, nom)
+        % affiche l'analyse <dossier>\(analyses\<nom>) de cette condition
+        if ismember(condition, dd_cond.ItemsData)
+            condition_courante = condition;
+            dd_cond.Value = condition;
+        end
+        dossier_resultats = dossier;
+        ef_dossier.Value = dossier;
+        ef_dossier.Tooltip = dossier;
+        remplir_analyses(nom);
+        selection = [];
+        rafraichir_table();
+        journal(sprintf('Analysis %s: step 1 %s | %s', code_analyse(dossier_analyse()), dossier, texte_analyse()));
+        reglage_de_l_analyse();
+        memoriser_choix();
+    end
+
+    function ouvrir_registre()
+        % 22 nov. (demandé par l'utilisateur) : tableau de toutes les analyses
+        ecran2 = get(groot, 'ScreenSize');
+        f2 = uifigure('Name', 'Analyses', 'Position', [20 60 min(1860, ecran2(3) - 40) min(820, ecran2(4) - 120)]);
+        g2 = uigridlayout(f2, [4 1]);
+        g2.RowHeight = {34, '1x', 60, 28};
+        lbl2 = uilabel(g2, 'Text', 'Reading the analyses...', 'WordWrap', 'on');
+        t2 = uitable(g2, 'RowName', {}, 'ColumnSortable', true);
+        try, t2.SelectionType = 'row'; catch, end
+        txt2 = uitextarea(g2, 'Editable', 'off', 'FontSize', 11, ...
+            'Value', {'Select a row: its full settings and folders are shown here.'});
+        gb2 = uigridlayout(g2, [1 5], 'Padding', 0, 'ColumnSpacing', 6);
+        gb2.ColumnWidth = {130, 130, 130, '1x', 110};
+        uibutton(gb2, 'Text', 'Choose', 'FontWeight', 'bold', 'ButtonPushedFcn', @(~, ~) choisir());
+        uibutton(gb2, 'Text', 'Open folder', 'ButtonPushedFcn', @(~, ~) ouvrir());
+        uibutton(gb2, 'Text', 'Rescan all', 'Tooltip', 'Read every analysis again (slower; otherwise only changed ones)', ...
+            'ButtonPushedFcn', @(~, ~) remplir('rescanner'));
+        uilabel(gb2, 'Text', '');
+        uibutton(gb2, 'Text', 'Close', 'ButtonPushedFcn', @(~, ~) delete(f2));
+        T2 = table();
+        ligne_choisie = [];
+        t2.CellSelectionCallback = @(~, e) noter(e);
+        try, t2.DoubleClickedFcn = @(~, ~) choisir(); catch, end
+        drawnow;
+        remplir('');
+
+        function remplir(mode)
+            lbl2.Text = 'Reading the analyses...';
+            drawnow;
+            try
+                T2 = registre_analyses(racine_analyses(), mode);
+            catch err
+                lbl2.Text = ['Error: ' err.message];
+                return
+            end
+            vues = {'Code', 'Condition', 'Date', 'Step1_folder', 'Analysis', 'Version', ...
+                'Steps', 'Sessions', 'Last_run', 'SCE', 'Assemblies', 'Testable', 'Pct_p05', ...
+                'Pct_pminp05', 'N_q05', 'N_q10', 'Settings'};
+            t2.Data = table2cell(T2(:, vues));     % cellules : ColumnFormat (22.2 et non 22.2000)
+            t2.ColumnName = {'Code', 'Condition', 'Date', 'Step 1 folder', 'Analysis', 'Version', ...
+                'Steps (sessions)', 'Sessions ok', 'Last run', 'SCEs', 'Assemblies', ...
+                'Testable', '% p<0.05', '% p_minp<0.05', 'q<0.05', 'q<0.10', 'Settings'};
+            t2.ColumnWidth = {45, 60, 105, 160, 200, 45, 110, 70, 150, 55, 75, 65, 70, 100, 58, 58, 'auto'};
+            try
+                t2.ColumnFormat = [repmat({'char'}, 1, 9), repmat({'shortG'}, 1, 7), {'char'}];
+            catch
+            end
+            % analyse affichée en surbrillance
+            i = find(strcmpi(T2.Analysis_path, dossier_analyse()), 1);
+            try
+                removeStyle(t2);
+                if ~isempty(i), addStyle(t2, uistyle('BackgroundColor', [1 0.95 0.7]), 'row', i); end
+            catch
+            end
+            lbl2.Text = sprintf(['%d analyses (newest code first; click a column title to sort). ' ...
+                'Steps: number of sessions done at each step. Bias: field / global test, testable ' ...
+                'assemblies; p = hypergeometric p of the most enriched colour (uncorrected); q = BH ' ...
+                'FDR of step 4. Highlighted: the analysis shown. Double-click or Choose to display one.'], height(T2));
+            ligne_choisie = [];
+        end
+
+        function noter(e)
+            ligne_choisie = [];
+            if isempty(e.Indices), return; end
+            r = e.Indices(end, 1);
+            % ligne affichée -> ligne du tableau (tri possible)
+            try
+                if ~isempty(t2.DisplayData), code = t2.DisplayData{r, 1}; else, code = t2.Data{r, 1}; end
+                ligne_choisie = find(strcmp(T2.Code, code), 1);
+            catch
+                ligne_choisie = r;
+            end
+            if ~isempty(ligne_choisie) && ligne_choisie <= height(T2)
+                L = T2(ligne_choisie, :);
+                txt2.Value = {sprintf('%s  %s | %s | %s', L.Code{1}, L.Condition{1}, L.Step1_folder{1}, L.Analysis{1}); ...
+                    ['Settings: ' L.Settings{1}]; ['Steps 2-4: ' L.Analysis_path{1}]};
+            end
+        end
+
+        function choisir()
+            if isempty(ligne_choisie) || ligne_choisie > height(T2)
+                uialert(f2, 'Select an analysis in the table first.', 'Analyses');
+                return
+            end
+            if en_cours
+                uialert(f2, 'An analysis is running: wait until it ends.', 'Analyses');
+                return
+            end
+            L = T2(ligne_choisie, :);
+            cond = 'sans_indice';
+            if strcmp(L.Condition{1}, 'cues'), cond = 'avec_indice'; end
+            nom = L.Analysis{1};
+            if strcmp(nom, 'main'), nom = ''; end
+            aller_a(cond, L.Step1_path{1}, nom);
+            figure(fig);
+            delete(f2);
+        end
+
+        function ouvrir()
+            if isempty(ligne_choisie), return; end
+            winopen(T2.Analysis_path{ligne_choisie});
+        end
     end
 
     function changer_analyse(v)
@@ -703,6 +901,8 @@ rafraichir_table();
         if ~isempty(selection), remplir_K(selection(end)); afficher(); end
         journal(sprintf('Analysis (steps 2-4): %s', texte_analyse()));
         reglage_de_l_analyse();
+        mettre_titre();
+        memoriser_choix();
     end
 
     function reglage_de_l_analyse()
@@ -762,6 +962,12 @@ rafraichir_table();
         if isempty(nom) || ~isempty(regexp(nom, '[\\/:*?"<>|]', 'once')) || any(strcmp(nom, {'.', '..'}))
             uialert(fig, 'Invalid name (no \ / : * ? " < > |).', 'New analysis');
             return
+        end
+        % 22 nov. : la version vient du nom ; avec version_assemblees = 'v2'
+        % (config_brainbow), '_v2' est ajouté comme le fait dossiers_analyse
+        if strcmpi(char(config0.version_assemblees), 'v2') && ...
+                ~est_v2(fullfile(dossier_resultats, 'analyses', nom))
+            nom = [nom '_v2'];
         end
         d = fullfile(dossier_resultats, 'analyses', nom);
         if ~isfolder(d), mkdir(d); end
@@ -864,6 +1070,7 @@ rafraichir_table();
         rafraichir_table();
         if ~isempty(selection), remplir_K(selection(end)); afficher(); end
         journal(sprintf('Step 1 folder: %s | analysis: %s', d, texte_analyse()));
+        memoriser_choix();
         sans_etape1 = isempty(dir(fullfile(d, '*', 'pretraitement.mat')));
         if sans_etape1 && ~isempty(dir(fullfile(d, '*', 'choix_K.mat')))
             % steps 2-3 without step 1: a separate analysis folder (old way)
