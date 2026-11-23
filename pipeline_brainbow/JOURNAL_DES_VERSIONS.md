@@ -6,6 +6,18 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.23c (23 nov.)
+- Tableau des analyses (`utilitaires/registre_analyses.m`), demandé par
+  l'utilisateur (« tu as inclus ces dernières analyses dans l'interface ? ») :
+  les dossiers d'étape 1 sont maintenant cherchés jusqu'à 3 niveaux sous
+  `nocues` et `cues` (avant : seulement juste en dessous). Visibles en plus :
+  `nocuesiltre_gros_evenements\pa*` (et les 9 consensus de 4 PA / 300 ms),
+  `nocues	est_seuil_transients\cascade_pa` (dont tous34_v2), les essais de
+  modèles CASCADE. Ne descend pas dans un dossier d'étape 1, ni dans
+  `analyses`, ni dans un screening (grille.mat), ni dans `etape1`,
+  `variantes`, `resultats`, `agregation`. 101 analyses (codes déjà donnés
+  inchangés, nouveaux codes ajoutés).
+
 ## 2026.11.23b (23 nov.)
 - Screening, classement refait avec une partie seulement des choix du K
   (demandé par l'utilisateur : « revérifier différents réglages du consensus

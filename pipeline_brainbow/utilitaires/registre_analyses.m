@@ -64,10 +64,13 @@ conditions = {'nocues', 'no cues'; 'cues', 'cues'};
 lignes = {};
 for ic = 1:size(conditions, 1)
     dc = fullfile(racine, conditions{ic, 1});
-    L = dir(dc);
-    L = L([L.isdir] & ~ismember({L.name}, {'.', '..'}));
-    for i = 1:numel(L)
-        d1 = fullfile(dc, L(i).name);
+    % 23 nov. (demandé par l'utilisateur : voir aussi les analyses rangées plus
+    % profond, ex. nocues\filtre_gros_evenements\pa4_300ms,
+    % nocues\test_seuil_transients\cascade_pa) : dossiers d'étape 1 cherchés
+    % jusqu'à 3 niveaux sous nocues / cues
+    dossiers_e1 = chercher_etape1(dc, 3);
+    for i = 1:numel(dossiers_e1)
+        d1 = dossiers_e1{i};
         pre = dir(fullfile(d1, '*', 'pretraitement.mat'));
         if isempty(pre), continue; end          % pas un dossier d'étape 1
         [n_sce, R] = sce_etape1(d1, pre, R);
@@ -416,4 +419,27 @@ end
 
 function v = champ(P, c, def)
 if isfield(P, c) && ~isempty(P.(c)), v = P.(c); else, v = def; end
+end
+
+
+function liste = chercher_etape1(d, profondeur)
+% Dossiers d'étape 1 (au moins un <session>\pretraitement.mat) sous d, jusqu'à
+% « profondeur » niveaux. On ne descend pas dans un dossier d'étape 1 (ses
+% sous-dossiers sont des sessions), ni dans 'analyses', ni dans un dossier de
+% screening (grille.mat : son étape 1 n'a pas d'assemblées à afficher par
+% session), ni dans les dossiers de résultats d'un screening.
+liste = {};
+if profondeur < 1 || ~isfolder(d), return; end
+L = dir(d);
+L = L([L.isdir] & ~ismember({L.name}, {'.', '..'}));
+for i = 1:numel(L)
+    sd = fullfile(d, L(i).name);
+    if ismember(lower(L(i).name), {'analyses', 'variantes', 'etape1', 'resultats', 'agregation'}), continue; end
+    if isfile(fullfile(sd, 'grille.mat')), continue; end            % screening
+    if ~isempty(dir(fullfile(sd, '*', 'pretraitement.mat')))
+        liste{end+1} = sd; %#ok<AGROW>
+    else
+        liste = [liste, chercher_etape1(sd, profondeur - 1)]; %#ok<AGROW>
+    end
+end
 end
