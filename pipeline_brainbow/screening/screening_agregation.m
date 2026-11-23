@@ -30,6 +30,11 @@ function S = screening_agregation(racine, G, sessions, config, opts)
 seuil          = config.clonal.seuilstat;
 nmin_couleur   = config.clonal.nmin_couleur;
 nmin_assemblee = config.clonal.nmin_assemblee;
+% 23 nov. (demandé par l'utilisateur) : mid-p et Tarone comme le pipeline
+% (config.clonal.midp / tarone ; absents = ancien calcul)
+midp   = isfield(config.clonal, 'midp') && config.clonal.midp;
+tarone = isfield(config.clonal, 'tarone') && config.clonal.tarone;
+fprintf('Screening : p_minp %s, %s\n', ternaire(midp, 'mid-p', 'classique'), ternaire(tarone, 'avec Tarone', 'sans Tarone'));
 fdr_seuil      = config.agreg.fdr_seuil;
 B              = opts.nNull;
 nTirages       = opts.nTirages;
@@ -166,7 +171,7 @@ for ip = 1:numel(iP)
         end
         n_col = sum(Obs, 2);
         L = table_minp(Kcol, max([n_col; 1]), nTirages, seuil, nmin_couleur, ...
-            mod(sessions(s).graine, 2^31 - 1000) + 31 * p);
+            mod(sessions(s).graine, 2^31 - 1000) + 31 * p, midp, tarone);
         nmax = size(L.PT, 1);
         nn = min(max(n_col, 1), nmax);                % n_col = 0 : ligne factice, annulée plus bas
         T = ones(tot, 1);
@@ -178,9 +183,13 @@ for ip = 1:numel(iP)
         for k = find(n_col >= 1)'
             ts = L.Ts(:, nn(k));
             n_le = sum(ts <= T(k) * (1 + tol));
-            pm(k) = (1 + n_le) / (nTirages + 1);
+            n_lt = sum(ts < T(k) * (1 - tol));
+            if midp
+                pm(k) = (n_lt + 0.5 * (n_le - n_lt + 1)) / (nTirages + 1);
+            else
+                pm(k) = (1 + n_le) / (nTirages + 1);
+            end
             if L.z_sd(nn(k)) > 0
-                n_lt = sum(ts < T(k) * (1 - tol));
                 p_mid = (n_lt + 0.5 * (n_le - n_lt)) / nTirages;
                 zo = sqrt(2) * erfcinv(2 * min(max(p_mid, bornes_p(1)), bornes_p(2)));
                 sc(k) = (zo - L.z_moy(nn(k))) / L.z_sd(nn(k));
@@ -364,6 +373,8 @@ S.max_nul = max_nul;
 S.opts = rmfield_si(opts, {'sessions', 'grille'});
 S.seuil = seuil; S.fdr_seuil = fdr_seuil;
 S.config_base = config;
+S.midp = midp;
+S.tarone = tarone;
 
 %% ---------- 5. Fichiers ------------------------------------------------------
 ecrire_combinaisons(fullfile(dossier_res, 'screening_combinaisons.csv'), S, 1:nComb);
@@ -534,4 +545,9 @@ for i = 1:n
     fprintf(fid, '%s\n', strjoin(txt(i, :), ','));
 end
 fclose(fid);
+end
+
+
+function t = ternaire(c, a, b)
+if c, t = a; else, t = b; end
 end

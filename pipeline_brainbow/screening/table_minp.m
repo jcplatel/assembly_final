@@ -1,4 +1,4 @@
-function L = table_minp(Kcol, nmax, nTirages, seuil, nmin_couleur, graine)
+function L = table_minp(Kcol, nmax, nTirages, seuil, nmin_couleur, graine, midp, tarone)
 %TABLE_MINP  p_minp d'une assemblée en fonction de son nombre de cellules
 %   colorées, pour un champ donné (13 nov., screening_reglages).
 %
@@ -18,12 +18,24 @@ function L = table_minp(Kcol, nmax, nTirages, seuil, nmin_couleur, graine)
 %   L.p_min_att(n)  : plus petite p_minp possible (toutes les cellules de la
 %                     couleur la plus favorable)
 %   L.z_moy, L.z_sd : pour le score continu (comme score_minp)
+%
+%   23 nov. (demandé par l'utilisateur : « à partir de maintenant tout calculer
+%   en mid-p Tarone ») : mêmes règles que stats_clonales_champ3
+%     midp   : ex aequo comptés à moitié : p = (n_< + 0,5 (n_= + 1)) / (nTirages + 1) ;
+%              taux_nul et p_min_att de la même façon (L.midp)
+%     tarone : pour chaque n, une couleur qui ne PEUT pas donner p < seuil
+%              (toutes les n cellules de cette couleur, ou toutes celles du
+%              champ) n'entre pas dans le min-p (L.PT mis à 1 pour elle)
+%   Absents ou false = ancien calcul.
 
+if nargin < 7 || isempty(midp), midp = false; end
+if nargin < 8 || isempty(tarone), tarone = false; end
 Kcol = Kcol(:)';
 nC = numel(Kcol);
 N = sum(Kcol);
 nmax = min(nmax, N);
-L = struct('Kcol', Kcol, 'N', N, 'nmax', nmax, 'nTirages', nTirages, 'seuil', seuil, 'tol', 1e-10);
+L = struct('Kcol', Kcol, 'N', N, 'nmax', nmax, 'nTirages', nTirages, 'seuil', seuil, 'tol', 1e-10, ...
+    'midp', midp, 'tarone', tarone);
 L.PT = ones(max(nmax, 1), nC, max(nmax, 1) + 1);
 L.Ts = ones(nTirages, max(nmax, 1));
 L.borne = -inf(max(nmax, 1), 1);
@@ -38,6 +50,11 @@ for n = 1:nmax
     for c = find(valide)
         L.PT(n, c, 1:n + 1) = hygecdf((0:n) - 1, N, Kcol(c), n, 'upper');
         L.PT(n, c, 1) = 1;
+    end
+    if tarone        % couleurs qui ne peuvent pas atteindre le seuil pour cette taille
+        for c = find(valide)
+            if L.PT(n, c, min(n, Kcol(c)) + 1) >= seuil, L.PT(n, c, :) = 1; end
+        end
     end
 end
 
@@ -62,17 +79,33 @@ for n = 1:nmax
     cnt = accumarray(rang(:), 1);
     cum = cumsum(cnt);
     % p_minp si le T observé vaut u(k) : (1 + nb de tirages <= u(k)) / (nTirages + 1)
-    k = find((1 + cum) / (nTirages + 1) < seuil, 1, 'last');
+    % (mid-p : (nb < u(k) + 0,5 (nb = u(k) + 1)) / (nTirages + 1))
+    if midp
+        p_u = (cum - cnt + 0.5 * (cnt + 1)) / (nTirages + 1);
+    else
+        p_u = (1 + cum) / (nTirages + 1);
+    end
+    k = find(p_u < seuil, 1, 'last');
     if isempty(k), k = 0; end
     if k < numel(u), L.borne(n) = u(k + 1); else, L.borne(n) = Inf; end
     % taux_nul et score : mêmes définitions que stats_clonales_champ3
-    L.taux_nul(n) = sum(cnt(cum / nTirages < seuil)) / nTirages;
+    if midp
+        L.taux_nul(n) = sum(cnt((cum - 0.5 * cnt) / nTirages < seuil)) / nTirages;
+    else
+        L.taux_nul(n) = sum(cnt(cum / nTirages < seuil)) / nTirages;
+    end
     m_max = min(n, Kcol);
     Tmin = Inf;
     for c = find(valide)
         Tmin = min(Tmin, L.PT(n, c, m_max(c) + 1));
     end
-    L.p_min_att(n) = (1 + sum(t <= Tmin * (1 + tol))) / (nTirages + 1);
+    n_le = sum(t <= Tmin * (1 + tol));
+    if midp
+        n_lt = sum(t < Tmin * (1 - tol));
+        L.p_min_att(n) = (n_lt + 0.5 * (n_le - n_lt + 1)) / (nTirages + 1);
+    else
+        L.p_min_att(n) = (1 + n_le) / (nTirages + 1);
+    end
     p_mid = (cum - 0.5 * cnt) / nTirages;
     z = sqrt(2) * erfcinv(2 * min(max(p_mid, bornes_p(1)), bornes_p(2)));   % = -norminv(p)
     L.z_moy(n) = sum(cnt .* z) / nTirages;

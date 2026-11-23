@@ -23,6 +23,14 @@ L{end+1} = sprintf(['Combinaisons essayées : %d, dont %d éligibles (au moins %
     'au total et %d par animal).'], numel(el), nEl, S.opts.min_testables, S.opts.min_par_animal);
 L{end+1} = sprintf(['Mesure : EXCÈS = %% d''assemblées biaisées (p_minp < %g, test champ_globale) - %% attendu ' ...
     'par hasard, calculé par animal puis moyenné sur les animaux (en points).'], S.seuil);
+% 23 nov. : calcul de p_minp (mid-p / Tarone, comme le pipeline, ou ancien)
+calc = 'p_minp classique, sans Tarone (ancien calcul)';
+if isfield(S, 'midp') && S.midp && isfield(S, 'tarone') && S.tarone
+    calc = 'p_minp mid-p avec Tarone (comme le pipeline)';
+elseif isfield(S, 'midp') && (S.midp || S.tarone)
+    calc = sprintf('p_minp %s, %s', ternaire_r(S.midp, 'mid-p', 'classique'), ternaire_r(S.tarone, 'avec Tarone', 'sans Tarone'));
+end
+L{end+1} = sprintf('Calcul : %s ; le taux attendu suit la même règle.', calc);
 L{end+1} = '';
 if nEl == 0
     L{end+1} = 'Aucune combinaison éligible : rien à classer.';
@@ -316,4 +324,9 @@ for z = 1:numel(noms)
     parts{z} = sprintf('''%s'', %s', noms{z}, texte_valeur(s.(noms{z})));
 end
 t = ['struct(' strjoin(parts, ', ') ')'];
+end
+
+
+function t = ternaire_r(c, a, b)
+if c, t = a; else, t = b; end
 end

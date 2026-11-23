@@ -6,6 +6,20 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.23a (23 nov.)
+- **Screening en mid-p + Tarone** (demandé par l'utilisateur : « à partir de
+  maintenant tout calculer en mid-p Tarone ») : `screening/table_minp.m`
+  prend deux arguments `midp` et `tarone` (mêmes règles que
+  stats_clonales_champ3 : ex aequo comptés à moitié pour p_minp, taux_nul et
+  p_min_att ; pour chaque taille, les couleurs qui ne peuvent pas atteindre
+  le seuil sortent du min-p) ; `screening_agregation.m` les lit dans
+  config.clonal (true par défaut depuis 21b) et calcule la p observée de la
+  même façon ; `resume_screening.m` écrit le calcul utilisé.
+  Vérifié sur les 30 assemblées testables de resultats_cascade75_mpd6 :
+  p_minp de la table contre celle du pipeline, corrélation 0,999 (log),
+  écart médian 1 %, mêmes 30 décisions à p < 0,05 ; taux attendu 5,0 % contre
+  5,2 %. Les screenings faits avant (21 et 22 nov.) étaient en ancien calcul.
+
 ## 2026.11.22d (22 nov.)
 - Étape 4, demandé par l'utilisateur (« fais un code pour quantifier ça et une
   figure au moment de l'agrégation ») : `4_agregation/profil_assemblees.m`,
