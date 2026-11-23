@@ -47,6 +47,7 @@ nR = size(G.clusters, 1);
 nM = numel(G.membres);
 nV = numel(G.versions);
 nCh = numel(G.choix_K);
+noms_choixK_variantes = {};      % rempli si les variantes ont une autre liste de choix du K (23 nov.)
 nmc = numel(G.min_cellules);
 nms = numel(G.min_SCE);
 dossier_res = fullfile(racine, 'resultats');
@@ -130,6 +131,13 @@ for ip = 1:numel(iP)
     for s = 1:nS
         Rr = load(fichiers{p, s}, 'R');
         R = Rr.R;
+        if isempty(noms_choixK_variantes) && size(R.map_cons, 4) ~= nCh
+            % variantes calculées avec la grille complète des choix du K
+            Gc = grille_screening(config);
+            noms_choixK_variantes = {Gc.choix_K.nom};
+            fprintf('Variantes calculées avec %d choix du K : consensus retrouvés par leur nom.\n', ...
+                numel(noms_choixK_variantes));
+        end
         Rs{s} = rmfield(R, 'ens');
         cc = couleurs{s};
         if numel(cc) ~= R.NCell
@@ -228,7 +236,7 @@ for ip = 1:numel(iP)
                 for c = 1:nCh
                     idx = zeros(1, 0);
                     for s = 1:nS
-                        e = jeu_choisi(Rs{s}, G.choix_K(c), r, m, v, c);
+                        e = jeu_choisi(Rs{s}, G.choix_K(c), r, m, v, c, noms_choixK_variantes);
                         if e > 0
                             idx = [idx, decal(s) + deb{s}(e) + (1:nA_e{s}(e))]; %#ok<AGROW>
                         end
@@ -400,9 +408,16 @@ end
 
 
 %% =========================================================================
-function e = jeu_choisi(R, ch, r, m, v, c)
+function e = jeu_choisi(R, ch, r, m, v, c, noms_variantes)
 % Numéro du jeu d'assemblées d'une session pour un choix du K (0 = aucun).
+% 23 nov. : si les variantes ont été calculées avec une autre liste de choix
+% du K (ex. grille complète, classement refait avec les consensus seulement),
+% le consensus est retrouvé par son nom dans noms_variantes.
 e = 0;
+if strcmp(ch.type, 'consensus') && ~isempty(noms_variantes) && size(R.map_cons, 4) == numel(noms_variantes)
+    c = find(strcmp(noms_variantes, ch.nom), 1);
+    if isempty(c), return; end
+end
 switch ch.type
     case 'fixe'
         iK = find(R.liste_K == ch.K, 1);

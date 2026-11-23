@@ -6,6 +6,17 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.23b (23 nov.)
+- Screening, classement refait avec une partie seulement des choix du K
+  (demandé par l'utilisateur : « revérifier différents réglages du consensus
+  sur ces 3 animaux », sans K fixé) : `screening_agregation.m` retrouvait les
+  assemblées de consensus par leur NUMÉRO dans la grille ; avec une grille
+  réduite (consensus seulement) sur des variantes calculées avec la grille
+  complète, les numéros ne correspondaient plus (0 combinaison éligible).
+  Maintenant, si la liste des choix du K des variantes diffère, le consensus
+  est retrouvé par son NOM (grille complète de grille_screening). Même
+  grille : rien ne change.
+
 ## 2026.11.23a (23 nov.)
 - **Screening en mid-p + Tarone** (demandé par l'utilisateur : « à partir de
   maintenant tout calculer en mid-p Tarone ») : `screening/table_minp.m`
