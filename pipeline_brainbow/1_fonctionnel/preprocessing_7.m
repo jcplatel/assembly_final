@@ -62,6 +62,26 @@ else
     masque(bad_frames) = true;
     bad_frames = masque;
 end
+% 23 nov. (demandé par l'utilisateur) : images rejetées à la main, ex. un
+% artefact du champ (444119 220919 : une zone double de luminosité à 357 s).
+% Fichier facultatif images_rejetees_manuelles.mat dans le dossier suite2p :
+% intervalles_s (N x 2, en secondes depuis la 1re image) et raison (texte).
+% Ces images sont traitées comme les bad frames : hors ligne de base, hors
+% repos, raster à 0. La fenêtre de la ligne de base fait 120 s : pour une
+% marche de fluorescence, rejeter au moins 60 s après la marche, sinon la
+% ligne de base mélange les niveaux d'avant et d'après.
+n_rejet_manuel = 0;
+f_rejet = fullfile(path, 'images_rejetees_manuelles.mat');
+if isfile(f_rejet)
+    M = load(f_rejet, 'intervalles_s');
+    t_img = (0:Nz-1) / sampling_rate;
+    for k = 1:size(M.intervalles_s, 1)
+        rej = t_img >= M.intervalles_s(k, 1) & t_img <= M.intervalles_s(k, 2);
+        n_rejet_manuel = n_rejet_manuel + sum(rej & ~bad_frames);
+        bad_frames = bad_frames | rej;
+    end
+    fprintf('Images rejetées à la main (%s) : %d\n', f_rejet, n_rejet_manuel);
+end
 
 %% correction de la fuite de couleur (optionnelle)
 % Elle doit corriger la fluorescence à partir des CANAUX de couleur, jamais
@@ -242,6 +262,7 @@ diagnostic.doublons                  = doublons;
 diagnostic.tailles_roi               = tailles;
 diagnostic.population                = population;
 diagnostic.n_bad_frames_etendues     = sum(bad_frames_etendues);
+diagnostic.n_images_rejetees_manuelles = n_rejet_manuel;   % 23 nov.
 diagnostic.duree_repos_s             = numel(WinRest) / sampling_rate;
 if ~isempty(info_bouffees), diagnostic.bouffees = info_bouffees; end   % 18 nov.
 end

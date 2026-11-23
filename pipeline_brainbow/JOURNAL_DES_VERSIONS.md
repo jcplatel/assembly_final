@@ -6,6 +6,20 @@ analyse lancée avec. Pour revenir en arrière : reprendre le zip de la version
 voulue. Les versions avant le 11 nov. au soir n'avaient pas de numéro (zip
 toujours au même nom) ; elles sont résumées ici de mémoire du projet.
 
+## 2026.11.23d (23 nov.)
+- Images rejetées à la main (`1_fonctionnel/preprocessing_7.m`), demandé par
+  l'utilisateur (« retirer la minute touchée ») : fichier facultatif
+  `images_rejetees_manuelles.mat` dans le dossier suite2p (`intervalles_s`,
+  N x 2 en secondes, et `raison`). Ces images s'ajoutent aux bad frames :
+  hors ligne de base, hors repos, raster à 0 (nombre dans
+  `diagnostic.n_images_rejetees_manuelles`). Sans le fichier, rien ne change.
+- Créé pour 444119 220919 plane0 et plane1 : 355–420 s. À 357,3 s, la
+  fluorescence du bord droit du champ double d'un coup et le reste jusqu'à la
+  fin (artefact du champ, les 2 plans). Avec la ligne de base glissante, cela
+  donnait un plateau de dF/F d'environ 45 s, que CASCADE lisait comme une
+  décharge continue (fausse assemblée). 60 s au moins après la marche, car la
+  fenêtre de la ligne de base fait 120 s.
+
 ## 2026.11.23c (23 nov.)
 - Tableau des analyses (`utilitaires/registre_analyses.m`), demandé par
   l'utilisateur (« tu as inclus ces dernières analyses dans l'interface ? ») :
