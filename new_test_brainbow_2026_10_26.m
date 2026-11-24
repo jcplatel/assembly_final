@@ -13,7 +13,7 @@
 
 clear
 
-analyse_assembly_results5parfor_taille_2026_10_27
+analyse_assembly_results5parfor_taille_2026_10_27clo
 
 dossier_analyse = 'E:\Data\Aurelie\analysis\Final\assembly\nocues\';
 load(fullfile(dossier_analyse, 'best_k_par_session.mat'), 'best_k');

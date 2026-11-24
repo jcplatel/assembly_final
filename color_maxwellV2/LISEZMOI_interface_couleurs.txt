@@ -1,0 +1,42 @@
+INTERFACE_COULEURS (17 nov.)
+============================
+Interface pour attribuer et vérifier les couleurs Brainbow avec color_maxwellV2.
+
+Installation : copier tous les fichiers du zip dans le dossier color_maxwellV2
+(y compris brainbow_image_read, interactive_threshold_selection, triangle_maxwell
+et interactive_color_correction), puis dans MATLAB :
+    addpath('E:\...\color_maxwellV2', '-begin')
+    interface_couleurs
+(la table des sessions est celle de config_brainbow si le pipeline est dans le
+chemin, sinon elle est demandée ; ou interface_couleurs('E:\...\sessions_brainbow.xlsx')).
+
+Souris sur l image : molette = zoom autour du pointeur, clic droit maintenu =
+déplacer, double-clic = image entière. Le zoom est gardé quand on change une couleur.
+Les contours des cellules sont des traits continus (bord des pixels xext/yext de Fall.mat).
+
+Dans les fenêtres des étapes 4, 6 (seuil) et 9 (correction) : molette = zoom,
+clic droit maintenu = déplacer, clic du milieu (ou Maj+clic) = image entière ;
+dézoomer à la molette ramène aussi à l image entière. Attention : avant, le clic
+droit inversait aussi une cellule ; maintenant seul le clic gauche le fait.
+
+Vérifier un colorcell déjà fait :
+    1. cliquer une session à gauche (toutes les lignes de la table) ;
+    2. « Colours of » : le fichier à montrer ; « Compare with » : un 2e fichier
+       (accord, matrice de confusion, cellules en désaccord entourées) ;
+    3. clic sur une cellule : ses couleurs dans chaque fichier.
+
+Refaire les couleurs d'une session : boutons 1 à 10 à droite, dans l'ordre de
+color_predictor_model (les fonctions de l'utilisateur sont appelées telles
+quelles ; 4, 5, 6, 8 et 9 ouvrent leurs propres fenêtres). Après l'étape 7,
+la « working copy » est la classification automatique ; on peut la corriger
+en cliquant une cellule puis un bouton de couleur, ou avec l'étape 9.
+On peut aussi corriger un fichier existant : « Edit a copy of the displayed file ».
+
+Enregistrement (étape 10), dans le dossier suite2p de la session :
+    colorcell_MaxwellV2.mat (l'ancien est renommé avec la date),
+    couleurs_details_V2.mat (valeurs, proportions, seuils, fuite, recalage).
+Les autres fichiers de couleur ne sont jamais modifiés.
+
+Attention : le pipeline lit colorcell_GT, puis Maxwellnew, puis Maxwell.
+Il ne lit pas colorcell_MaxwellV2 tant que charger_couleurs n'est pas changé
+ou que la colonne fichier_colorcell de la table ne l'indique pas.

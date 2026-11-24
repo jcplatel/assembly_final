@@ -2,7 +2,7 @@
 clearvars; clc;
 
 % 1. Sélection du dossier racine
-rootFolder = "E:\Data\Aurelie\data\nocues\";
+rootFolder = 'E:\Data\Aurelie\data\nocues\446198';
 
 % 2. Recherche récursive de tous les fichiers .nwb dans le dossier et ses sous-dossiers
 nwb_files = dir(fullfile(rootFolder, '**', '*.nwb'));
